@@ -86,7 +86,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         response.setHeader("Set-Cookie", cookieValue);
 
         // Redirect without token in URL
-        response.sendRedirect("http://localhost:3000/feed");
+        response.sendRedirect("http://localhost/home");
         // response.sendRedirect("http://localhost:5500/callback.html?token=" + token);
         // // 4. Send JWT as JSON response
         // response.setContentType("application/json");

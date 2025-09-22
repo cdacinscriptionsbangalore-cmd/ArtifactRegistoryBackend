@@ -4,6 +4,22 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+.gitignore
+.env
+### Maven ###
+log/
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+# Uncomment if you have tasks that create the maven wrapper jar
+# .mvn/wrapper/maven-wrapper.jar
+
 ### STS ###
 .apt_generated
 .classpath

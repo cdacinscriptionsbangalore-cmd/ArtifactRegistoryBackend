@@ -13,7 +13,7 @@ spring:
               - openid
               - profile
               - email
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            redirect-uri: "http://localhost/api/login/oauth2/code/{registrationId}"
             
           # Facebook OAuth2 Configuration
           facebook:
