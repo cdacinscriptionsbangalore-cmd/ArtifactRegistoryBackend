@@ -13,8 +13,8 @@ spring:
               - openid
               - profile
               - email
-            redirect-uri: "http://localhost/api/login/oauth2/code/{registrationId}"
-            
+            redirect-uri: "https://inscriptions.cdacb.in/api/login/oauth2/code/{registrationId}"
+            # redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
           # Facebook OAuth2 Configuration
           facebook:
             client-id: ${FACEBOOK_CLIENT_ID}

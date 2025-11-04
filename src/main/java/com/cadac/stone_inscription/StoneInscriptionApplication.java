@@ -8,7 +8,7 @@ public class StoneInscriptionApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(StoneInscriptionApplication.class, args);
-		System.out.println("Application started successfull All Fix");
+		System.out.println("Application started successfull All Fix final");
 	}
 
 }

@@ -77,7 +77,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         }
 
         String cookieValue = String.format(
-                "token=%s; userId=%s; Path=/; Max-Age=%d; Secure; SameSite=none",
+                "token=%s; userId=%s; Path=/; secure; Domain=inscriptions.cdacb.in; Max-Age=%d; SameSite=none",
                 token,
                 existingUser.getId().toHexString(),
                 24 * 60 * 60 // 24 hours in seconds
@@ -86,9 +86,9 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         response.setHeader("Set-Cookie", cookieValue);
 
         // Redirect without token in URL
-        response.sendRedirect("http://localhost/home");
-        // response.sendRedirect("http://localhost:5500/callback.html?token=" + token);
-        // // 4. Send JWT as JSON response
+        response.sendRedirect("https://inscriptions.cdacb.in/home");
+        // response.sendRedirect("https://inscriptions.cdacb.in:5500/callback.html?token=" + token);
+        // // // 4. Send JWT as JSON response
         // response.setContentType("application/json");
         // response.setCharacterEncoding("UTF-8");
         // Map<String, String> tokenResponse = Map.of("token", token);

@@ -184,6 +184,10 @@ public class InscriptionPost {
         @JsonProperty("region")
         private String region;
 
+         @Field("country")
+        @JsonProperty("country")
+        private String country;
+
         @GeoSpatialIndexed
         private List<Double> coordinates; // [lon, lat] for geo queries
     }

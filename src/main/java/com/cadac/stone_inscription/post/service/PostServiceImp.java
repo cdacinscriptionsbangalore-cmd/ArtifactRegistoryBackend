@@ -83,10 +83,20 @@ public class PostServiceImp implements PostService {
         // Double similarty = ImagePhash.imagePHashComparing(ls.get(0).getPHash(),
         // ls.get(ls.size() - 1).getPHash());
 
-        Optional<ImageMetadataGeolocationWithPhash.GeoCordinates> geoLocationCordinates = ls.stream()
-                .map(el -> el.getGeocCordinates())
-                .filter(Objects::nonNull)
+        Optional<ImageMetadataGeolocationWithPhash.ImageMetaAndInfo> geoLocationInfoAndCordinates = ls.stream()
+                .filter(el -> el.getGeocCordinates() != null)
                 .findFirst();
+
+        Optional<ImageMetadataGeolocationWithPhash.GeoCordinates> geoLocationCordinates = geoLocationInfoAndCordinates
+                .isPresent()
+                        ? Optional
+                                .of(geoLocationInfoAndCordinates.get().getGeocCordinates())
+                        : Optional.empty();
+        // Optional<ImageMetadataGeolocationWithPhash.GeoCordinates>
+        // geoLocationCordinates = ls.stream()
+        // .map(el -> el.getGeocCordinates())
+        // .filter(Objects::nonNull)
+        // .findFirst();
 
         User user = userRepository.findByEmail(usernameFromToken);
 
@@ -108,7 +118,8 @@ public class PostServiceImp implements PostService {
 
             inscriptionPost.getDescription().setGeolocation(InscriptionPost.GeoLocation.builder()
                     .lat(geoLocationCordinates.get().getLatitude())
-                    .lon(geoLocationCordinates.get().getLongitude()).build());
+                    .lon(geoLocationCordinates.get().getLongitude()).city(geoLocationInfoAndCordinates.get().getCity())
+                    .state(geoLocationInfoAndCordinates.get().getState()).country(geoLocationInfoAndCordinates.get().getCountry()).build());
 
         }
 
@@ -123,7 +134,6 @@ public class PostServiceImp implements PostService {
                             .build())
                     .build())).getId();
         }).toList();
-
 
         inscriptionPost
                 .setImages(InscriptionPost.Images.builder().image(imageId).thumbnailImage(imageId.get(0)).build());
@@ -143,7 +153,8 @@ public class PostServiceImp implements PostService {
                     el -> backendUrl + "/post/public/images/" + el)
                     .toList());
 
-            elem.getImages().setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+            elem.getImages()
+                    .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
 
         });
 
@@ -169,7 +180,8 @@ public class PostServiceImp implements PostService {
                     el -> backendUrl + "/post/public/images/" + el)
                     .toList());
 
-            elem.getImages().setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+            elem.getImages()
+                    .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
 
         });
 

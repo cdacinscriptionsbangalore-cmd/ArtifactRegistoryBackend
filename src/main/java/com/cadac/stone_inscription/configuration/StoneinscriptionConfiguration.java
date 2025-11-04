@@ -21,6 +21,8 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 import com.cadac.stone_inscription.auth.CustomOAuth2SuccessHandler;
 import com.cadac.stone_inscription.auth.JwtAuthenticationEntryPoint;
@@ -44,7 +46,7 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         private ExceptionHandlerFilter exceptionHandlerFilter;
 
         @Value("${app.cors.url}")
-        private String corsUrl;
+        private  String corsUrl;
 
         @Bean
         public PasswordEncoder passwordEncoder() {
@@ -68,57 +70,45 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
                                 .passwordEncoder(passwordEncoder());
                 return authenticationManagerBuilder.build();
         }
-
-        // @Bean
-        // public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // http
-        // .authorizeHttpRequests(authz -> authz
-        // .anyRequest().permitAll())
-        // .exceptionHandling(
-        // exceptionHandling -> exceptionHandling
-        // .authenticationEntryPoint(jwtAuthenticationEntryPoint))
-        // .sessionManagement(
-        // sessionManagement -> sessionManagement
-        // .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        // .csrf(csrf -> csrf.disable())
-        // .addFilterBefore(jwtRequestFilter,
-        // UsernamePasswordAuthenticationFilter.class)
-        // .oauth2Login(Customizer.withDefaults());
-
-        // return http.build();
-        // }
-
+        
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http,
-                        CustomOAuth2SuccessHandler successHandler) throws Exception {
+                                        CustomOAuth2SuccessHandler successHandler) throws Exception {
 
-                return http
-                .cors(Customizer.withDefaults()) 
-                                .authorizeHttpRequests(authz -> authz
-                                                // Public API section
-                                                .requestMatchers("/api/v1/noauth/**" ,"/post/public/**").permitAll()
+        http
+                .cors(Customizer.withDefaults())
+                .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
+                .requestMatchers("/api/v1/**", "/post/**").authenticated()
+                .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
+                .anyRequest().permitAll()
+                )
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                )
+                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
 
-                                                // Secured API section
-                                                .requestMatchers("/api/v1/**" ,"/post/**").authenticated()
+                // 🧱 Security headers for XSS & content protection
+                .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp
+                        .policyDirectives("default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; " +
+                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+                  "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
+                  "object-src 'none'; base-uri 'self'; frame-ancestors 'none';")
 
-                                                // OAuth2 endpoints
-                                                .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
+                )
+                .frameOptions(frame -> frame.deny()) // Prevent clickjacking
+                .contentTypeOptions(Customizer.withDefaults()) // Prevent MIME sniffing
+                // .referrerPolicy(ref -> ref.policy(ReferrerPolicy.NO_REFERRER))
+                .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(31536000)
+                )
+                );
 
-                                                // Default - all other endpoints are public
-                                                .anyRequest().permitAll())
-
-                                .exceptionHandling(exceptionHandling -> exceptionHandling
-                                                .authenticationEntryPoint(jwtAuthenticationEntryPoint))
-                                .sessionManagement(sessionManagement -> sessionManagement
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .csrf(csrf -> csrf.disable())
-                                // Make sure exception sent in user formate to client
-                                .addFilterBefore(exceptionHandlerFilter, UsernamePasswordAuthenticationFilter.class)
-                                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
-                                // .oauth2Login(Customizer.withDefaults())
-                                .oauth2Login(oauth2 -> oauth2
-                                                .successHandler(successHandler))
-                                .build();
+        return http.build();
         }
-
 }
