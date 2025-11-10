@@ -29,6 +29,14 @@ import com.cadac.stone_inscription.auth.JwtAuthenticationEntryPoint;
 import com.cadac.stone_inscription.auth.JwtRequestFilter;
 import com.cadac.stone_inscription.exception.ExceptionHandlerFilter;
 
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+
+import java.util.Arrays;
+
 @Configuration
 @EnableWebSecurity
 @EnableMongoAuditing
@@ -54,6 +62,8 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         }
 
 
+        
+
         @Override
         public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
@@ -74,9 +84,16 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http,
                                         CustomOAuth2SuccessHandler successHandler) throws Exception {
-
+ CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+        requestHandler.setCsrfRequestAttributeName(null);
         http
                 .cors(Customizer.withDefaults())
+                    .csrf(csrf -> csrf
+                                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRequestHandler(requestHandler)
+                // Disable CSRF for public endpoints if needed
+                .ignoringRequestMatchers("/api/public/**")
+            )
                 .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
                 .requestMatchers("/api/v1/**", "/post/**").authenticated()

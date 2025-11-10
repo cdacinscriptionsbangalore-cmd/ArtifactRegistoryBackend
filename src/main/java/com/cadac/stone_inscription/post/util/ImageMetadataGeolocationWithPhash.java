@@ -1,6 +1,7 @@
 package com.cadac.stone_inscription.post.util;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -18,6 +19,7 @@ import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.Tag;
 import com.drew.metadata.exif.GpsDirectory;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import dev.brachtendorf.jimagehash.hash.Hash;
 import lombok.AllArgsConstructor;
@@ -29,13 +31,56 @@ import lombok.NoArgsConstructor;
 public class ImageMetadataGeolocationWithPhash {
 
     @Value("${geolocation.api.url}")
-    private  String BASE_URL;
+    private String BASE_URL;
 
     @Data
     @Builder
     @AllArgsConstructor
     @NoArgsConstructor
     public static class GeoApiResponse {
+
+        @Builder.Default
+        @JsonProperty("place_id")
+        private Long placeId = 0L;
+
+        @Builder.Default
+        private String licence = "";
+
+        @Builder.Default
+        @JsonProperty("osm_type")
+        private String osmType = "";
+
+        @Builder.Default
+        @JsonProperty("osm_id")
+        private Long osmId = 0L;
+
+        @Builder.Default
+        @JsonProperty("class")
+        private String clazz = ""; // "class" is reserved in Java
+
+        @Builder.Default
+        private String type = "";
+
+        @Builder.Default
+        @JsonProperty("place_rank")
+        private Integer placeRank = 0;
+
+        @Builder.Default
+        private Double importance = 0.0;
+
+        @Builder.Default
+        @JsonProperty("addresstype")
+        private String addressType = "";
+
+        @Builder.Default
+        private String name = "";
+
+        @Builder.Default
+        @JsonProperty("display_name")
+        private String displayName = "";
+
+        @Builder.Default
+        private List<String> boundingbox = new ArrayList<>();
 
         private Address address;
 
@@ -47,10 +92,48 @@ public class ImageMetadataGeolocationWithPhash {
     @NoArgsConstructor
     public static class Address {
 
-        private String city;
-        private String state;
-        private String country;
+        @Builder.Default
+        private String amenity = "";
 
+        @Builder.Default
+        private String road = "";
+
+        @Builder.Default
+        private String neighbourhood = "";
+
+        @Builder.Default
+        private String suburb = "";
+
+        @Builder.Default
+        @JsonProperty("city_district")
+        private String cityDistrict = "";
+
+        @Builder.Default
+        private String city = "";
+
+        @Builder.Default
+        private String county = "";
+
+        @Builder.Default
+        @JsonProperty("state_district")
+        private String stateDistrict = "";
+
+        @Builder.Default
+        private String state = "";
+
+        @Builder.Default
+        @JsonProperty("ISO3166-2-lvl4")
+        private String iso3166Lvl4 = "";
+
+        @Builder.Default
+        private String postcode = "";
+
+        @Builder.Default
+        private String country = "";
+
+        @Builder.Default
+        @JsonProperty("country_code")
+        private String countryCode = "";
     }
 
     @Data
@@ -73,9 +156,10 @@ public class ImageMetadataGeolocationWithPhash {
         private String contentType;
         private Hash pHash;
         private GeoCordinates geocCordinates;
-        private String city;
-        private String state;
-        private String country;
+        private GeoApiResponse geoApiResponse;
+        // private String city;
+        // private String state;
+        // private String country;
 
     }
 
@@ -103,10 +187,12 @@ public class ImageMetadataGeolocationWithPhash {
                                 Double latitude = geoLocation.getLatitude();
                                 Double longitude = geoLocation.getLongitude();
 
-                                Address address = getAddress(latitude, longitude);
-                                info.setCity(address.getCity());
-                                info.setState(address.getState());
-                                info.setCountry(address.getCountry());
+                                info.setGeoApiResponse(getGeolocation(latitude, longitude));
+
+                                // Address address = getAddress(latitude, longitude);
+                                // info.setCity(address.getCity());
+                                // info.setState(address.getState());
+                                // info.setCountry(address.getCountry());
                                 info.setGeocCordinates(
                                         (GeoCordinates.builder().latitude(latitude.toString())
                                                 .longitude(longitude.toString()).build()));
@@ -133,20 +219,21 @@ public class ImageMetadataGeolocationWithPhash {
         return ls;
     }
 
-    public Address getAddress(double latitude, double longitude) {
+    public GeoApiResponse getGeolocation(double latitude, double longitude) {
 
         String url = BASE_URL + "?lat=" + latitude + "&lon=" + longitude + "&format=json";
 
         try {
             GeoApiResponse response = new RestTemplate().getForObject(url, GeoApiResponse.class);
             if (response != null && response.getAddress() != null) {
-                return response.getAddress();
+                return response;
             } else {
 
                 throw new StoneInscriptionException("Geo Location Not Found invalid lat long", HttpStatus.NOT_FOUND);
             }
 
         } catch (Exception e) {
+
             throw new StoneInscriptionException("Geo Location Failed to Map", HttpStatus.UNPROCESSABLE_ENTITY);
         }
 

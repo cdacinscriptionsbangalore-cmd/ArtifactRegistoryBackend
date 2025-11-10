@@ -38,6 +38,9 @@ public class JwtUtil {
 
 	private String jwtKey;
 
+	@Autowired
+	private StoneInscriptionUserDetailservice  stoneInscriptionUserDetailservice;
+
 	JwtUtil() {
 		SecureRandom secureRandom = new SecureRandom();
 		byte[] keyBytes = new byte[32]; // 32 bytes for a 256-bit key
@@ -180,4 +183,32 @@ public class JwtUtil {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	public String refreshToken(String token) throws JOSEException, ParseException {
+		SignedJWT signedJWT = SignedJWT.parse(token);
+		JWSVerifier verifier = new MACVerifier(jwtKey);
+
+		if (!signedJWT.verify(verifier)) {
+			System.out.println("Token verification failed!");
+			throw new BadCredentialsException("Invalid token.");
+		}
+
+		Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+		if (expirationTime == null || new Date().after(expirationTime)) {
+			System.out.println("Token has expired!");
+			throw new BadCredentialsException("Token has expired.");
+		}
+
+		// Extract username and role
+		String username = getUsernameFromToken(token);
+		String role = (String) signedJWT.getJWTClaimsSet().getClaim("role");
+
+		System.out.println("Refreshing token for user: " + username);
+		// Create a dummy UserDetails object (Spring Security requires it)
+		// UserDetails userDetails = new User(username, "", Collections.emptyList());
+
+		UserDetails userDetails = stoneInscriptionUserDetailservice.loadUserByUsername(username);
+		// Generate new token with updated expiration
+		return generateToken(userDetails, role);
+	}
 }

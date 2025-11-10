@@ -43,17 +43,19 @@ public class PostController {
     public ResponseEntity<?> addPostWithFile(
             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
             HttpServletRequest request,
-            @RequestPart("files") MultipartFile... files) throws IOException {
+             @RequestPart("files") MultipartFile... files) throws IOException {
+if (files == null || files.length == 0) {
+            throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+        }
 
+        Arrays.stream(files).forEach(file -> {
 
-        // Arrays.stream(files).forEach(file -> {
+            if (!Arrays.stream(fileExt).anyMatch((ext) -> file.getOriginalFilename().endsWith(ext))) {
+                throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
+                        HttpStatus.BAD_REQUEST);
+            }
 
-        //     if (!Arrays.stream(fileExt).anyMatch((ext) -> file.getOriginalFilename().endsWith(ext))) {
-        //         throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
-        //                 HttpStatus.BAD_REQUEST);
-        //     }
-
-        // });
+        });
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);

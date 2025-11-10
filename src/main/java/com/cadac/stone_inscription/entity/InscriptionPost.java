@@ -171,22 +171,62 @@ public class InscriptionPost {
         @NotNull
         @NotEmpty
         private String lat;
+        
+        private String amenity;
+        private String road;
+        private String neighbourhood;
+        private String suburb;
 
-        @Field("state")
-        @JsonProperty("state")
+        @JsonProperty("city_district")
+        private String cityDistrict;
+
+        private String city;
+        private String county;
+
+        @JsonProperty("state_district")
+        private String stateDistrict;
+
         private String state;
 
-        @Field("city")
-        @JsonProperty("city")
-        private String city;
+        @JsonProperty("ISO3166-2-lvl4")
+        private String iso3166Lvl4;
 
-        @Field("region")
-        @JsonProperty("region")
-        private String region;
-
-         @Field("country")
-        @JsonProperty("country")
+        private String postcode;
         private String country;
+
+        @JsonProperty("country_code")
+        private String countryCode;
+
+        @JsonProperty("place_id")
+        private Long placeId;
+
+        private String licence;
+
+        @JsonProperty("osm_type")
+        private String osmType;
+
+        @JsonProperty("osm_id")
+        private Long osmId;
+
+        @JsonProperty("class")
+        private String clazz; // "class" is reserved in Java, so renamed to clazz
+
+        private String type;
+
+        @JsonProperty("place_rank")
+        private Integer placeRank;
+
+        private Double importance;
+
+        @JsonProperty("addresstype")
+        private String addressType;
+
+        private String name;
+
+        @JsonProperty("display_name")
+        private String displayName;
+
+        private List<String> boundingbox;
 
         @GeoSpatialIndexed
         private List<Double> coordinates; // [lon, lat] for geo queries

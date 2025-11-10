@@ -65,6 +65,10 @@ public class PostServiceImp implements PostService {
 
         List<ImageMetaAndInfo> ls = metadataGeolocationWithPhash.getGeoLocationWithIamgeMetaandInfo(files);
 
+        if(ls.size() == 0){
+            throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
+        }
+
         if (ls.size() != ls.stream().map(ImageMetaAndInfo::getPHash).distinct().count()) {
             throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
         }
@@ -77,6 +81,7 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
 
         }
+        
 
         // Below Line To use for Threshold similarty
 
@@ -118,8 +123,37 @@ public class PostServiceImp implements PostService {
 
             inscriptionPost.getDescription().setGeolocation(InscriptionPost.GeoLocation.builder()
                     .lat(geoLocationCordinates.get().getLatitude())
-                    .lon(geoLocationCordinates.get().getLongitude()).city(geoLocationInfoAndCordinates.get().getCity())
-                    .state(geoLocationInfoAndCordinates.get().getState()).country(geoLocationInfoAndCordinates.get().getCountry()).build());
+                    .lon(geoLocationCordinates.get().getLongitude())
+                    .city(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getCity())
+                    .state(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getState())
+                    .country(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getCountry())
+                    .amenity(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getAmenity())
+                    .road(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getRoad())
+                    .neighbourhood(
+                            geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getNeighbourhood())
+                    .suburb(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getSuburb())
+                    .cityDistrict(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getCityDistrict())
+                    .stateDistrict(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress()
+                            .getStateDistrict())
+                    .iso3166Lvl4(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress()
+                            .getIso3166Lvl4())
+                    .postcode(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getPostcode())
+                    .county(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress().getCounty())
+                    .countryCode(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddress()
+                            .getCountryCode())
+                    .placeId(geoLocationInfoAndCordinates.get().getGeoApiResponse().getPlaceId())
+                    .licence(geoLocationInfoAndCordinates.get().getGeoApiResponse().getLicence())
+                    .osmType(geoLocationInfoAndCordinates.get().getGeoApiResponse().getOsmType())
+                    .osmId(geoLocationInfoAndCordinates.get().getGeoApiResponse().getOsmId())
+                    .clazz(geoLocationInfoAndCordinates.get().getGeoApiResponse().getClazz())
+                    .type(geoLocationInfoAndCordinates.get().getGeoApiResponse().getType())
+                    .placeRank(geoLocationInfoAndCordinates.get().getGeoApiResponse().getPlaceRank())
+                    .importance(geoLocationInfoAndCordinates.get().getGeoApiResponse().getImportance())
+                    .addressType(geoLocationInfoAndCordinates.get().getGeoApiResponse().getAddressType())
+                    .name(geoLocationInfoAndCordinates.get().getGeoApiResponse().getName())
+                    .displayName(geoLocationInfoAndCordinates.get().getGeoApiResponse().getDisplayName())
+                    .boundingbox(geoLocationInfoAndCordinates.get().getGeoApiResponse().getBoundingbox())
+                    .build());
 
         }
 
