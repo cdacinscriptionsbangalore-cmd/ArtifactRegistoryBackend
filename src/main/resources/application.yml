@@ -1,6 +1,18 @@
 spring:
   config:
     import: "optional:file:.env[.properties]"
+  management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
   security:
     oauth2:
       client:

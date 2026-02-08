@@ -15,7 +15,6 @@ import java.util.List;
 @AllArgsConstructor
 public class InscriptionPostDto {
 
-
     @JsonProperty("description")
     private DescriptionDto description;
 
@@ -28,13 +27,15 @@ public class InscriptionPostDto {
     @JsonProperty("type")
     private String type;
 
+    @JsonProperty("visiblity")
+    private Boolean visiblity;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DescriptionDto {
-        
+
         @JsonProperty("title")
         private String title;
 
@@ -52,6 +53,4 @@ public class InscriptionPostDto {
 
     }
 
-
 }
-

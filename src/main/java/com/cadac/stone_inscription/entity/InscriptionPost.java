@@ -43,6 +43,10 @@ public class InscriptionPost {
     @JsonSerialize(using = ToStringSerializer.class)
     private ObjectId userId;
 
+    @Transient
+    @JsonProperty("username")
+    private String userName;
+
     @CreatedDate
     @Field("createdAt")
     @JsonProperty("createdAt")
@@ -74,6 +78,11 @@ public class InscriptionPost {
     @Field("type")
     @JsonProperty("type")
     private String type;
+
+    @Field("visiblity")
+    @JsonProperty("visiblity")
+    @Builder.Default
+    private Boolean visiblity = true;
 
     @Field("distance")
     @JsonProperty("distance")
@@ -171,7 +180,7 @@ public class InscriptionPost {
         @NotNull
         @NotEmpty
         private String lat;
-        
+
         private String amenity;
         private String road;
         private String neighbourhood;

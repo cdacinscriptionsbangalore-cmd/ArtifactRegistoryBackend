@@ -88,7 +88,7 @@ public class JwtUtil {
 
 	public String doGenerateToken(Map<String, Object> claims) throws JOSEException {
 		// long expirationTimeInMillis = 20 * 60 * 1000; // 20 minutes in milliseconds
-		long expirationTimeInMillis = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+		long expirationTimeInMillis =  3L * 60 * 1000;// 3 min
 
 		// long expirationTimeInMillis = 60000;
 		Date issuedAt = new Date(System.currentTimeMillis());

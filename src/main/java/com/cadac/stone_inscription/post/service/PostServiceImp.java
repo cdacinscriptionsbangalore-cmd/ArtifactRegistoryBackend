@@ -65,7 +65,7 @@ public class PostServiceImp implements PostService {
 
         List<ImageMetaAndInfo> ls = metadataGeolocationWithPhash.getGeoLocationWithIamgeMetaandInfo(files);
 
-        if(ls.size() == 0){
+        if (ls.size() == 0) {
             throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
         }
 
@@ -81,7 +81,6 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
 
         }
-        
 
         // Below Line To use for Threshold similarty
 
@@ -172,6 +171,8 @@ public class PostServiceImp implements PostService {
         inscriptionPost
                 .setImages(InscriptionPost.Images.builder().image(imageId).thumbnailImage(imageId.get(0)).build());
 
+        inscriptionPost.setVisiblity(inscriptionPostDto.getVisiblity());
+
         inscriptionPostRepo.save(inscriptionPost);
         return UserResponse.responseHandler("Images Uploaded Sucessfully", HttpStatus.OK, true);
     }
@@ -182,6 +183,10 @@ public class PostServiceImp implements PostService {
         List<InscriptionPost> allPost = inscriptionPostRepo.findAll();
 
         allPost.forEach(elem -> {
+
+            if (elem.getVisiblity() || elem.getVisiblity() == null) {
+                elem.setUserName(userRepository.findById(elem.getUserId()).get().getName());
+            }
 
             elem.getImages().setImage(elem.getImages().getImage().stream().map(
                     el -> backendUrl + "/post/public/images/" + el)

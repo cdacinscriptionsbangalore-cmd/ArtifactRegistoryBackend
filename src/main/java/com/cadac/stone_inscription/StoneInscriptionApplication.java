@@ -8,7 +8,7 @@ public class StoneInscriptionApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(StoneInscriptionApplication.class, args);
-		System.out.println("Application started successfull All Fix final");
+		System.out.println("Application started successfull All Fix final visiblity JWT Cookie Fix");
 	}
 
 }
