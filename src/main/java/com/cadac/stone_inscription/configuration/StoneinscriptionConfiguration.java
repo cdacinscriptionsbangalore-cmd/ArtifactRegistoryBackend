@@ -88,11 +88,11 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         requestHandler.setCsrfRequestAttributeName(null);
         http
                 .cors(Customizer.withDefaults())
-                    .csrf(csrf -> csrf
-                                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(requestHandler)
+                    .csrf(csrf -> csrf.disable()
+                                //  .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        // .csrfTokenRequestHandler(requestHandler)
                 // Disable CSRF for public endpoints if needed
-                .ignoringRequestMatchers("/api/public/**")
+                // .ignoringRequestMatchers("/api/public/**")
             )
                 .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
