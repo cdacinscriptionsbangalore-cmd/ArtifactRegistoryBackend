@@ -12,7 +12,7 @@ public interface UserRepository extends MongoRepository<User, ObjectId> {
 
     User findByEmail(String usernameFromToken);
 
-
+    User findByAuthId(ObjectId userId);
 
 
 

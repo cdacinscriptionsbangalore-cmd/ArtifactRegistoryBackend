@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -54,24 +55,38 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         private ExceptionHandlerFilter exceptionHandlerFilter;
 
         @Value("${app.cors.url}")
-        private  String corsUrl;
+        private String corsUrl;
 
         @Bean
         public PasswordEncoder passwordEncoder() {
                 return new BCryptPasswordEncoder();
         }
 
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
+                CorsConfiguration configuration = new CorsConfiguration();
 
-        
+                configuration.setAllowedOrigins(Arrays.asList(corsUrl));
+                configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                configuration.setAllowedHeaders(Arrays.asList("*"));
+                configuration.setExposedHeaders(Arrays.asList("*"));
+                configuration.setAllowCredentials(true);
 
-        @Override
-        public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**")
-                                .allowedOrigins(corsUrl)
-                                .allowedMethods("GET", "POST", "PUT", "DELETE")
-                                .allowedHeaders("*")
-                                .exposedHeaders("*");
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                source.registerCorsConfiguration("/**", configuration);
+
+                return source;
         }
+
+        // @Override
+        // public void addCorsMappings(CorsRegistry registry) {
+        // registry.addMapping("/**")
+        // .allowedOrigins(corsUrl)
+        // .allowedMethods("GET", "POST", "PUT", "DELETE")
+        // .allowedHeaders("*")
+        // .exposedHeaders("*");
+        // }
+
         @Bean
         public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
                 AuthenticationManagerBuilder authenticationManagerBuilder = http
@@ -80,52 +95,104 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
                                 .passwordEncoder(passwordEncoder());
                 return authenticationManagerBuilder.build();
         }
-        
+
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http,
-                                        CustomOAuth2SuccessHandler successHandler) throws Exception {
- CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-        requestHandler.setCsrfRequestAttributeName(null);
-        http
-                .cors(Customizer.withDefaults())
-                    .csrf(csrf -> csrf
-                                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(requestHandler)
-                // Disable CSRF for public endpoints if needed
-                .ignoringRequestMatchers("/api/public/**")
-            )
-                .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
-                .requestMatchers("/api/v1/**", "/post/**").authenticated()
-                .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
-                .anyRequest().permitAll()
-                )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                )
-                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
-                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+                        CustomOAuth2SuccessHandler successHandler) throws Exception {
 
-                // 🧱 Security headers for XSS & content protection
-                .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp
-                        .policyDirectives("default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; " +
-                  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-                  "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
-                  "object-src 'none'; base-uri 'self'; frame-ancestors 'none';")
+                http
+                            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                )
-                .frameOptions(frame -> frame.deny()) // Prevent clickjacking
-                .contentTypeOptions(Customizer.withDefaults()) // Prevent MIME sniffing
-                // .referrerPolicy(ref -> ref.policy(ReferrerPolicy.NO_REFERRER))
-                .httpStrictTransportSecurity(hsts -> hsts
-                        .includeSubDomains(true)
-                        .maxAgeInSeconds(31536000)
-                )
-                );
+                                // ✅ Disable CSRF completely for JWT stateless API
+                                .csrf(AbstractHttpConfigurer::disable)
 
-        return http.build();
+                                .authorizeHttpRequests(authz -> authz
+                                                .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
+                                                .requestMatchers("/api/v1/**", "/post/**").authenticated()
+                                                .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
+                                                .anyRequest().permitAll())
+
+                                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+
+                                // ✅ Stateless session (required for JWT)
+                                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+
+                                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+
+                                // Security headers
+                                .headers(headers -> headers
+                                                .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                                                "default-src 'self'; " +
+                                                                                "script-src 'self' https://www.google.com https://www.gstatic.com; "
+                                                                                +
+                                                                                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                                                                                +
+                                                                                "font-src 'self' https://fonts.gstatic.com; "
+                                                                                +
+                                                                                "img-src 'self' data:; " +
+                                                                                "object-src 'none'; " +
+                                                                                "base-uri 'self'; " +
+                                                                                "frame-ancestors 'none';"))
+                                                .frameOptions(frame -> frame.deny())
+                                                .contentTypeOptions(Customizer.withDefaults())
+                                                .httpStrictTransportSecurity(hsts -> hsts
+                                                                .includeSubDomains(true)
+                                                                .maxAgeInSeconds(31536000)));
+
+                return http.build();
         }
+        // @Bean
+        // public SecurityFilterChain filterChain(HttpSecurity http,
+        // CustomOAuth2SuccessHandler successHandler) throws Exception {
+        // CsrfTokenRequestAttributeHandler requestHandler = new
+        // CsrfTokenRequestAttributeHandler();
+        // requestHandler.setCsrfRequestAttributeName(null);
+        // http
+        // .cors(Customizer.withDefaults())
+        // .csrf(csrf -> csrf.disable() )
+        // // .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+        // // .csrfTokenRequestHandler(requestHandler)
+        // // Disable CSRF for public endpoints if needed
+        // // .ignoringRequestMatchers("/api/public/**")
+
+        // .authorizeHttpRequests(authz -> authz
+        // .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
+        // .requestMatchers("/api/v1/**", "/post/**").authenticated()
+        // .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
+        // .anyRequest().permitAll()
+        // )
+        // .exceptionHandling(ex ->
+        // ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+        // .sessionManagement(sm ->
+        // sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        // .csrf(csrf -> csrf
+        // .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+        // )
+        // .addFilterBefore(jwtRequestFilter,
+        // UsernamePasswordAuthenticationFilter.class)
+        // .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+
+        // // 🧱 Security headers for XSS & content protection
+        // .headers(headers -> headers
+        // .contentSecurityPolicy(csp -> csp
+        // .policyDirectives("default-src 'self'; script-src 'self'
+        // https://www.google.com https://www.gstatic.com; " +
+        // "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        // "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; " +
+        // "object-src 'none'; base-uri 'self'; frame-ancestors 'none';")
+
+        // )
+        // .frameOptions(frame -> frame.deny()) // Prevent clickjacking
+        // .contentTypeOptions(Customizer.withDefaults()) // Prevent MIME sniffing
+        // // .referrerPolicy(ref -> ref.policy(ReferrerPolicy.NO_REFERRER))
+        // .httpStrictTransportSecurity(hsts -> hsts
+        // .includeSubDomains(true)
+        // .maxAgeInSeconds(31536000)
+        // )
+        // );
+
+        // return http.build();
+        // }
 }

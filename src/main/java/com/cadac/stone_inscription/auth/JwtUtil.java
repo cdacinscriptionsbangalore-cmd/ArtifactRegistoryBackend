@@ -121,29 +121,59 @@ public class JwtUtil {
 	}
 
 	public boolean validateToken(String authToken) {
-		try {
-			System.out.println("validation");
-			// Jwt token has not been tampered with
-			SignedJWT signedJWT = SignedJWT.parse(authToken);
-			JWSVerifier verifier = new MACVerifier(jwtKey);
+    try {
+        if (authToken == null || authToken.isEmpty()) {
+            return false;
+        }
 
-			if (signedJWT.verify(verifier)) {
-				// Check if the token has expired
-				Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-				if (expirationTime == null || new Date().after(expirationTime)) {
-					throw new BadCredentialsException("JWT token has expired.");
-				}
-				return true;
-			} else {
-				throw new BadCredentialsException(
-						"JWT signature does not match locally computed signature. JWT validity cannot be asserted and should not be trusted.");
-			}
-		} catch (JOSEException ex) {
-			throw new BadCredentialsException("1", ex);
-		} catch (ParseException ex) {
-			throw new BadCredentialsException("2", ex);
-		}
-	}
+        SignedJWT signedJWT = SignedJWT.parse(authToken);
+        JWSVerifier verifier = new MACVerifier(jwtKey);
+
+        // Verify signature
+        if (!signedJWT.verify(verifier)) {
+            return false;
+        }
+
+        // Check expiration
+        Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        if (expirationTime == null) {
+            return false;
+        }
+
+        // Token must NOT be expired
+        return new Date().before(expirationTime);
+
+    } catch (Exception e) {
+        // Any parsing / verification error = invalid token
+        return false;
+    }
+}
+
+	// public boolean validateToken(String authToken) {
+	// 	try {
+	// 		System.out.println("validation");
+	// 		// Jwt token has not been tampered with
+	// 		SignedJWT signedJWT = SignedJWT.parse(authToken);
+	// 		JWSVerifier verifier = new MACVerifier(jwtKey);
+
+	// 		if (signedJWT.verify(verifier)) {
+	// 			// Check if the token has expired
+	// 			Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+	// 			if (expirationTime == null || new Date().after(expirationTime)) {
+	// 				throw new BadCredentialsException("JWT token has expired.");
+	// 			}
+	// 			return true;
+	// 		} else {
+	// 			throw new BadCredentialsException(
+	// 					"JWT signature does not match locally computed signature. JWT validity cannot be asserted and should not be trusted.");
+	// 		}
+	// 	} catch (JOSEException ex) {
+	// 		throw new BadCredentialsException("1", ex);
+	// 	} catch (ParseException ex) {
+	// 		throw new BadCredentialsException("2", ex);
+	// 	}
+	// }
 
 	public String getUsernameFromToken(String token) {
 		try {

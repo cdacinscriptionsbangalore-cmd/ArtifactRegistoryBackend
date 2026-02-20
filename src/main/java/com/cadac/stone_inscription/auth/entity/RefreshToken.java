@@ -2,6 +2,7 @@ package com.cadac.stone_inscription.auth.entity;
 import java.time.LocalDateTime;
 
 import org.bson.types.ObjectId;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import lombok.Builder;
@@ -11,7 +12,9 @@ import lombok.Data;
 @Builder
 @Data
 public class RefreshToken {
-
+    
+    @Id
+    private String id;
     private String tokenHash;
     private ObjectId userId;
     private LocalDateTime expiresAt;

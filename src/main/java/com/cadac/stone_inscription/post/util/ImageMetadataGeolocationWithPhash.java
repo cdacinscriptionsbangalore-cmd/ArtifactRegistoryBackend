@@ -2,13 +2,18 @@ package com.cadac.stone_inscription.post.util;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-
+import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -165,6 +170,7 @@ public class ImageMetadataGeolocationWithPhash {
 
     public List<ImageMetaAndInfo> getGeoLocationWithIamgeMetaandInfo(MultipartFile... files) {
 
+
         List<ImageMetaAndInfo> ls = new LinkedList<>();
 
         try {
@@ -179,6 +185,7 @@ public class ImageMetadataGeolocationWithPhash {
 
                         // Extract GPS directory
                         GpsDirectory gpsDirectory = metadata.getFirstDirectoryOfType(GpsDirectory.class);
+
 
                         if (gpsDirectory != null) {
                             GeoLocation geoLocation = gpsDirectory.getGeoLocation();
@@ -204,6 +211,9 @@ public class ImageMetadataGeolocationWithPhash {
                             System.out.println("null hai bhai");
                         }
                     }
+
+                    
+
                     ls.add(info);
                 }
 
@@ -212,6 +222,8 @@ public class ImageMetadataGeolocationWithPhash {
             // Now continue saving your post with file + geo location
 
         } catch (Exception e) {
+
+
             e.printStackTrace();
 
         }
@@ -219,24 +231,75 @@ public class ImageMetadataGeolocationWithPhash {
         return ls;
     }
 
+    // public GeoApiResponse getGeolocation(double latitude, double longitude) {
+
+    //     String url = BASE_URL + "?lat=" + latitude + "&lon=" + longitude + "&format=json  -H \"Accept: application/json";
+
+    //     try {
+    //         GeoApiResponse response = new RestTemplate().getForObject(url, GeoApiResponse.class);
+    //         if (response != null && response.getAddress() != null) {
+    //             return response;
+    //         } else {
+
+    //             throw new StoneInscriptionException("Geo Location Not Found invalid lat long", HttpStatus.NOT_FOUND);
+    //         }
+
+    //     } catch (Exception e) {
+
+    //         throw new StoneInscriptionException("Geo Location Failed to Map", HttpStatus.UNPROCESSABLE_ENTITY);
+    //     }
+
+    // }
+
     public GeoApiResponse getGeolocation(double latitude, double longitude) {
 
-        String url = BASE_URL + "?lat=" + latitude + "&lon=" + longitude + "&format=json";
+    String url = BASE_URL + "?lat=" + latitude +
+                 "&lon=" + longitude +
+                 "&format=json";
 
-        try {
-            GeoApiResponse response = new RestTemplate().getForObject(url, GeoApiResponse.class);
-            if (response != null && response.getAddress() != null) {
-                return response;
-            } else {
+    try {
 
-                throw new StoneInscriptionException("Geo Location Not Found invalid lat long", HttpStatus.NOT_FOUND);
-            }
+        RestTemplate restTemplate = new RestTemplate();
 
-        } catch (Exception e) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "StoneInscriptionApp/1.0 (mohit@yourdomain.com)");
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
 
-            throw new StoneInscriptionException("Geo Location Failed to Map", HttpStatus.UNPROCESSABLE_ENTITY);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<GeoApiResponse> response =
+                restTemplate.exchange(
+                        url,
+                        HttpMethod.GET,
+                        entity,
+                        GeoApiResponse.class
+                );
+
+        GeoApiResponse body = response.getBody();
+
+        if (body != null && body.getAddress() != null) {
+            return body;
+        } else {
+            throw new StoneInscriptionException(
+                    "Geo Location Not Found: Invalid lat/long",
+                    HttpStatus.NOT_FOUND
+            );
         }
 
+    } catch (HttpClientErrorException.Forbidden ex) {
+
+        throw new StoneInscriptionException(
+                "Geo Location Blocked by Nominatim (403) – Add valid User-Agent",
+                HttpStatus.TOO_MANY_REQUESTS
+        );
+
+    } catch (Exception e) {
+
+        throw new StoneInscriptionException(
+                "Geo Location Failed to Map",
+                HttpStatus.UNPROCESSABLE_ENTITY
+        );
     }
+}
 
 }
