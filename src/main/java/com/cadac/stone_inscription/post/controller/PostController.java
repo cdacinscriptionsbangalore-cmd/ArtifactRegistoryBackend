@@ -9,7 +9,6 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,8 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
-import com.cadac.stone_inscription.post.service.PostService;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
+import com.cadac.stone_inscription.post.service.PostService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -67,7 +66,7 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/getAllPost")
-    @Secured("user")
+    // @Secured("user")
     public ResponseEntity<?> getAllPost() {
 
         return postService.getAllPost();
