@@ -39,6 +39,11 @@ private ObjectId id;
   @Indexed
   private String name;
 
+  @Field("username")
+  @JsonProperty("username")
+  @Indexed(unique = true)
+  private String username;
+
   @Field("email")
   @JsonProperty("email")
   @Email
@@ -48,6 +53,10 @@ private ObjectId id;
   @Field("profileImage")
   @JsonProperty("profileImage")
   private String profileImage;
+
+  @Field("coverImage")
+  @JsonProperty("coverImage")
+  private String coverImage;
 
   @Field("imagesUploaded")
   @JsonProperty("imagesUploaded")
