@@ -28,6 +28,9 @@ public class UserProfileResponse {
     @JsonProperty("coverImage")
     private String coverImage;
 
+    @JsonProperty("bio")
+    private String bio;
+
     @JsonProperty("imagesUploaded")
     private Integer imagesUploaded;
 
