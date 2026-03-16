@@ -1,14 +1,15 @@
 package com.cadac.stone_inscription.post.service;
 
 import java.io.ByteArrayInputStream;
-import java.math.BigInteger;
-import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.bson.types.ObjectId;
@@ -59,28 +60,13 @@ public class PostServiceImp implements PostService {
     @Value("${app.backend.url}")
     private String backendUrl;
 
+// Create Post + Process Images + Extract Location + Save Post + Update User Stats
+    
     @Override
     public ResponseEntity<?> addPostWithFile(InscriptionPostDto inscriptionPostDto, MultipartFile[] files,
             String usernameFromToken) {
 
-        List<ImageMetaAndInfo> ls = metadataGeolocationWithPhash.getGeoLocationWithIamgeMetaandInfo(files);
-
-        if (ls.size() == 0) {
-            throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
-        }
-
-        if (ls.size() != ls.stream().map(ImageMetaAndInfo::getPHash).distinct().count()) {
-            throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
-        }
-
-        if (ls.stream().filter(
-                el -> imagesDataRepo.findFirstByMetadata_ImageHashValue(el.getPHash().getHashValue().toString())
-                        .isPresent())
-                .collect(Collectors.toList()).size() > 0) {
-
-            throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
-
-        }
+        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
 
         // Below Line To use for Threshold similarty
 
@@ -159,19 +145,14 @@ public class PostServiceImp implements PostService {
         inscriptionPost = inscriptionPostRepo.save(inscriptionPost);
         ObjectId postId = inscriptionPost.getId();
 
-        List<String> imageId = ls.stream().map(el -> {
-            return imagesDataRepo.save(imagesDataRepo.save(ImagesData
-                    .builder().imageData(el.getFile()).postId(postId)
-                    .metadata(ImagesData.Metadata.builder().fileName(el.getFileName()).fileSize(el.getFileSize())
-                            .contentType(el.getContentType()).imageHashValue(el.getPHash().getHashValue().toString())
-                            .build())
-                    .build())).getId();
-        }).toList();
+        List<String> imageId = saveImages(postId, ls);
 
         inscriptionPost
                 .setImages(InscriptionPost.Images.builder().image(imageId).thumbnailImage(imageId.get(0)).build());
 
-        inscriptionPost.setVisiblity(inscriptionPostDto.getVisiblity());
+        if (inscriptionPostDto != null) {
+            inscriptionPost.setVisiblity(inscriptionPostDto.getVisiblity());
+        }
 
         inscriptionPostRepo.save(inscriptionPost);
         return UserResponse.responseHandler("Images Uploaded Sucessfully", HttpStatus.OK, true);
@@ -381,24 +362,70 @@ public class PostServiceImp implements PostService {
         return UserResponse.responseHandler("description deleted", HttpStatus.OK, true);
     }
 
+// Main function for the updation of the image
+//      edit post details
+//      delete some images
+//      upload new images
+//      keep at least one image in the post
+
     @Override
     public ResponseEntity<?> updatePost(String usernameFromToken, InscriptionPostDto inscriptionPostDto,
-            String postId) {
+            String postId, List<String> deletedImageIds, MultipartFile[] files) {
 
-        User user = userRepository.findByEmail(usernameFromToken);
-        Optional<InscriptionPost> inscrptionPost = inscriptionPostRepo.findById(new ObjectId(postId));
+        InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        List<String> existingImageIds = getExistingImageIds(post);
+        List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
+        Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
 
-        if (!user.getId().equals(inscrptionPost.get().getUserId())) {
-            throw new StoneInscriptionException("Unprocesable request Unauthorized", HttpStatus.UNAUTHORIZED);
+        ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
+
+        if (inscriptionPostDto != null) {
+            post.setDescription(PostMapper.toEntityDescription(inscriptionPostDto.getDescription()));
+            post.setScript(inscriptionPostDto.getScript());
+            post.setTopic(inscriptionPostDto.getTopic());
+            post.setType(inscriptionPostDto.getType());
         }
 
-        inscrptionPost.get().setDescription(PostMapper.toEntityDescription(inscriptionPostDto.getDescription()));
+        List<String> updatedImageIds = removeDeletedImageIds(existingImageIds, deletableImageIds);
+        updatedImageIds.addAll(saveImages(post.getId(), newImages));
 
-        inscrptionPost.get().setScript(inscriptionPostDto.getScript());
-        inscrptionPost.get().setTopic(inscriptionPostDto.getTopic());
-        inscrptionPost.get().setType(inscriptionPostDto.getType());
-        inscriptionPostRepo.save(inscrptionPost.get());
+        updatePostImages(post, updatedImageIds, deletableImageIds);
+        inscriptionPostRepo.save(post);
+        deleteImagesByIds(deletableImageIds);
         return UserResponse.responseHandler("post Updated ", HttpStatus.OK, true);
+    }
+
+    @Override
+    public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
+        InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+
+        List<String> updatedImageIds = getExistingImageIds(post);
+        updatedImageIds.addAll(saveImages(post.getId(), newImages));
+
+        updatePostImages(post, updatedImageIds, Collections.emptySet());
+        inscriptionPostRepo.save(post);
+
+        return UserResponse.responseHandler("Images Added To Post Successfully", HttpStatus.OK, true);
+    }
+
+    @Override
+    public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId, List<String> deletedImageIds) {
+        InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        List<String> existingImageIds = getExistingImageIds(post);
+        List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, true);
+        Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
+
+        ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), 0);
+
+        List<String> updatedImageIds = removeDeletedImageIds(existingImageIds, deletableImageIds);
+        updatePostImages(post, updatedImageIds, deletableImageIds);
+
+        inscriptionPostRepo.save(post);
+        deleteImagesByIds(deletableImageIds);
+
+        return UserResponse.responseHandler("Images Deleted From Post Successfully", HttpStatus.OK, true);
     }
 
     @Override
@@ -437,6 +464,134 @@ public class PostServiceImp implements PostService {
         counts.put("totalTranslations", 0);
 
         return UserResponse.responseHandler("Dashboard Counts", HttpStatus.OK, counts);
+    }
+
+    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, Set<String> replaceableImageIds,
+            boolean filesRequired) {
+        if (files == null || files.length == 0) {
+            if (filesRequired) {
+                throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+            }
+
+            return List.of();
+        }
+
+        List<ImageMetaAndInfo> ls = metadataGeolocationWithPhash.getGeoLocationWithIamgeMetaandInfo(files);
+
+        if (ls.size() == 0) {
+            throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
+        }
+
+        if (ls.size() != ls.stream().map(ImageMetaAndInfo::getPHash).distinct().count()) {
+            throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
+        }
+
+        boolean imageAlreadyExists = ls.stream().anyMatch(image -> {
+            Optional<ImagesData> existingImage = imagesDataRepo
+                    .findFirstByMetadata_ImageHashValue(image.getPHash().getHashValue().toString());
+            return existingImage.isPresent() && !replaceableImageIds.contains(existingImage.get().getId());
+        });
+
+        if (imageAlreadyExists) {
+            throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
+        }
+
+        return ls;
+    }
+
+    private List<String> saveImages(ObjectId postId, List<ImageMetaAndInfo> images) {
+        return images.stream().map(image -> imagesDataRepo.save(ImagesData.builder()
+                .imageData(image.getFile())
+                .postId(postId)
+                .metadata(ImagesData.Metadata.builder()
+                        .fileName(image.getFileName())
+                        .fileSize(image.getFileSize())
+                        .contentType(image.getContentType())
+                        .imageHashValue(image.getPHash().getHashValue().toString())
+                        .build())
+                .build()).getId()).toList();
+    }
+
+    private InscriptionPost getOwnedPost(String usernameFromToken, String postId) {
+        User user = userRepository.findByEmail(usernameFromToken);
+        Optional<InscriptionPost> inscriptionPost = inscriptionPostRepo.findById(new ObjectId(postId));
+
+        if (inscriptionPost.isEmpty()) {
+            throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!user.getId().equals(inscriptionPost.get().getUserId())) {
+            throw new StoneInscriptionException("Forbidden", HttpStatus.FORBIDDEN);
+        }
+
+        return inscriptionPost.get();
+    }
+
+    private List<String> getExistingImageIds(InscriptionPost post) {
+        if (post.getImages() == null || post.getImages().getImage() == null) {
+            return new LinkedList<>();
+        }
+
+        return new LinkedList<>(post.getImages().getImage());
+    }
+
+    private List<String> validateDeletedImageIds(List<String> existingImageIds, List<String> deletedImageIds,
+            boolean deletionRequired) {
+        List<String> imagesToDelete = sanitizeImageIds(deletedImageIds);
+
+        if (deletionRequired && imagesToDelete.isEmpty()) {
+            throw new StoneInscriptionException("No image selected for deletion", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!existingImageIds.containsAll(imagesToDelete)) {
+            throw new StoneInscriptionException("Invalid image selected for deletion", HttpStatus.BAD_REQUEST);
+        }
+
+        return imagesToDelete;
+    }
+
+    private void ensureMinimumImageCount(int existingImageCount, int deletedImageCount, int newImageCount) {
+        int finalImageCount = existingImageCount - deletedImageCount + newImageCount;
+
+        if (finalImageCount < 1) {
+            throw new StoneInscriptionException("Post should have at least one image", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private List<String> removeDeletedImageIds(List<String> existingImageIds, Set<String> deletableImageIds) {
+        return existingImageIds.stream()
+                .filter(imageId -> !deletableImageIds.contains(imageId))
+                .collect(Collectors.toCollection(LinkedList::new));
+    }
+
+    private void updatePostImages(InscriptionPost post, List<String> updatedImageIds, Set<String> removedImageIds) {
+        if (post.getImages() == null) {
+            post.setImages(InscriptionPost.Images.builder().build());
+        }
+
+        post.getImages().setImage(updatedImageIds);
+
+        if (post.getImages().getThumbnailImage() == null
+                || removedImageIds.contains(post.getImages().getThumbnailImage())) {
+            post.getImages().setThumbnailImage(updatedImageIds.get(0));
+        }
+    }
+
+    private void deleteImagesByIds(Set<String> imageIds) {
+        imageIds.forEach(imagesDataRepo::deleteById);
+    }
+
+    private List<String> sanitizeImageIds(List<String> imageIds) {
+        if (imageIds == null) {
+            return List.of();
+        }
+
+        return imageIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .distinct()
+                .toList();
     }
 
 }
