@@ -78,6 +78,21 @@ public class UserServiceImpl implements UserService {
             hasUpdates = true;
         }
 
+        if (request.getBio() != null) {
+            String newBio = request.getBio().trim();
+
+            if (newBio.length() < 3 || newBio.length() > 150) {
+                throw new StoneInscriptionException("Bio must be between 3 and 150 characters", HttpStatus.BAD_REQUEST);
+            }
+
+            if (!newBio.matches("^(?=.*[A-Za-z0-9])[A-Za-z0-9 ]+$")) {
+                throw new StoneInscriptionException("Bio can only contain letters, numbers, and spaces", HttpStatus.BAD_REQUEST);
+            }
+
+            user.setBio(newBio);
+            hasUpdates = true;
+        }
+
         if (!hasUpdates) {
             throw new StoneInscriptionException("No valid fields to update", HttpStatus.BAD_REQUEST);
         }
@@ -179,6 +194,7 @@ public class UserServiceImpl implements UserService {
                 .email(user.getEmail())
                 .profileImage(user.getProfileImage())
                 .coverImage(user.getCoverImage())
+                .bio(user.getBio())
                 .imagesUploaded(user.getImagesUploaded())
                 .upvotesReceived(user.getUpvotesReceived())
                 .followers(user.getFollowers())
