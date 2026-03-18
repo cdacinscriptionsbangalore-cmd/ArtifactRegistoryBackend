@@ -90,8 +90,7 @@ public class PostServiceImp implements PostService {
 
         User user = userRepository.findByEmail(usernameFromToken);
 
-        user.setImagesUploaded(user.getImagesUploaded() + ls.size());
-
+        adjustUserImagesUploaded(user, ls.size());
         userRepository.save(user);
 
         ObjectId postUserId = user.getId();
@@ -334,9 +333,10 @@ public class PostServiceImp implements PostService {
         if (!user.getId().toString().equals(postDelete.get().getUserId().toString())) {
             throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
         }
-        postDelete.get().getImages().getImage().stream().forEach(elem -> {
-            imagesDataRepo.deleteById(elem);
-        });
+        int deletedImageCount = getExistingImageIds(postDelete.get()).size();
+        getExistingImageIds(postDelete.get()).forEach(imagesDataRepo::deleteById);
+        adjustUserImagesUploaded(user, -deletedImageCount);
+        userRepository.save(user);
 
         publicPostDescriptionRepo.deleteAllByPostId(postId);
         inscriptionPostRepo.deleteById(new ObjectId(postId));
@@ -373,6 +373,7 @@ public class PostServiceImp implements PostService {
             String postId, List<String> deletedImageIds, MultipartFile[] files) {
 
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        User user = userRepository.findByEmail(usernameFromToken);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
@@ -393,12 +394,15 @@ public class PostServiceImp implements PostService {
         updatePostImages(post, updatedImageIds, deletableImageIds);
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
+        adjustUserImagesUploaded(user, newImages.size() - deletableImageIds.size());
+        userRepository.save(user);
         return UserResponse.responseHandler("post Updated ", HttpStatus.OK, true);
     }
 
     @Override
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        User user = userRepository.findByEmail(usernameFromToken);
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
 
         List<String> updatedImageIds = getExistingImageIds(post);
@@ -406,6 +410,8 @@ public class PostServiceImp implements PostService {
 
         updatePostImages(post, updatedImageIds, Collections.emptySet());
         inscriptionPostRepo.save(post);
+        adjustUserImagesUploaded(user, newImages.size());
+        userRepository.save(user);
 
         return UserResponse.responseHandler("Images Added To Post Successfully", HttpStatus.OK, true);
     }
@@ -413,6 +419,7 @@ public class PostServiceImp implements PostService {
     @Override
     public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId, List<String> deletedImageIds) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        User user = userRepository.findByEmail(usernameFromToken);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, true);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
@@ -424,6 +431,8 @@ public class PostServiceImp implements PostService {
 
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
+        adjustUserImagesUploaded(user, -deletableImageIds.size());
+        userRepository.save(user);
 
         return UserResponse.responseHandler("Images Deleted From Post Successfully", HttpStatus.OK, true);
     }
@@ -457,11 +466,19 @@ public class PostServiceImp implements PostService {
 
         List<InscriptionPost> allPost = inscriptionPostRepo.findAll();
 
-        counts.put("totalUsers", userRepository.findAll().size());
-        counts.put("totalPosts", allPost.size());
+        counts.put("totalUsers", Math.toIntExact(userRepository.count()));
+        counts.put("totalPosts", Math.toIntExact(inscriptionPostRepo.count()));
+        counts.put("totalImages", Math.toIntExact(imagesDataRepo.count()));
         counts.put("totalGeoTaggedPosts",
                 (int) allPost.stream().filter(el -> el.getDescription().getGeolocation() != null).count());
-        counts.put("totalTranslations", 0);
+        counts.put("totalTranslations", (int) allPost.stream()
+                .map(InscriptionPost::getDescription)
+                .filter(Objects::nonNull)
+                .map(InscriptionPost.Description::getEnglishTranslation)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(translation -> !translation.isEmpty())
+                .count());
 
         return UserResponse.responseHandler("Dashboard Counts", HttpStatus.OK, counts);
     }
@@ -579,6 +596,11 @@ public class PostServiceImp implements PostService {
 
     private void deleteImagesByIds(Set<String> imageIds) {
         imageIds.forEach(imagesDataRepo::deleteById);
+    }
+
+    private void adjustUserImagesUploaded(User user, int delta) {
+        int currentCount = user.getImagesUploaded() == null ? 0 : user.getImagesUploaded();
+        user.setImagesUploaded(Math.max(0, currentCount + delta));
     }
 
     private List<String> sanitizeImageIds(List<String> imageIds) {

@@ -315,6 +315,15 @@ public class PostController {
     //     return postService.deleteImagesFromPost(email, postId, deletedImageIds);
     // }
 
+    // @PostMapping("/test/postDelete/{email}")
+    // public ResponseEntity<?> postDeleteForTest(
+    //         @PathVariable String email,
+    //         @RequestParam String postId) {
+
+    //     return postService.postDelete(email, postId);
+    // }
+
+
     private MultipartFile[] getNonEmptyFiles(MultipartFile[] files) {
         if (files == null) {
             return new MultipartFile[0];
