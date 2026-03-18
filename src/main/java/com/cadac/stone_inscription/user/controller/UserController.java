@@ -114,6 +114,7 @@ public class UserController {
      * POST /api/v1/user/test/updateProfile/{email}
      */
     @PostMapping("/test/updateProfile/{email}")
+    // @Secured("user")
     public ResponseEntity<?> updateProfileForTest(
             @PathVariable String email,
             @Valid @RequestBody UpdateProfileRequest updateProfileRequest) {
