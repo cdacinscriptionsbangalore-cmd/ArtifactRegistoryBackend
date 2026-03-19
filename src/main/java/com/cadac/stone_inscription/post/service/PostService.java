@@ -1,5 +1,7 @@
 package com.cadac.stone_inscription.post.service;
 
+import java.util.List;
+
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,7 +39,12 @@ public interface PostService {
 
     ResponseEntity<?> descriptionDelete(String usernameFromToken, String descriptionId);
 
-    ResponseEntity<?> updatePost(String usernameFromToken, InscriptionPostDto inscriptionPostDto, String postId);
+    ResponseEntity<?> updatePost(String usernameFromToken, InscriptionPostDto inscriptionPostDto, String postId,
+            List<String> deletedImageIds, MultipartFile[] files);
+
+    ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files);
+
+    ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId, List<String> deletedImageIds);
 
     ResponseEntity<?> getCommentByUser(String usernameFromToken);
 

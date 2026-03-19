@@ -58,6 +58,10 @@ private ObjectId id;
   @JsonProperty("coverImage")
   private String coverImage;
 
+  @Field("bio")
+  @JsonProperty("bio")
+  private String bio;
+
   @Field("imagesUploaded")
   @JsonProperty("imagesUploaded")
   @Builder.Default
