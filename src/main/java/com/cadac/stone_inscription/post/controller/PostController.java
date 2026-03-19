@@ -410,7 +410,7 @@ public class PostController {
     }
 
     @PostMapping("/getCommentByUser")
-    // @Secured("user")
+    @Secured("user")
     public ResponseEntity<?> getCommentByUser(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
