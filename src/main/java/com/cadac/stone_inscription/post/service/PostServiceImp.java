@@ -60,13 +60,15 @@ public class PostServiceImp implements PostService {
     @Value("${app.backend.url}")
     private String backendUrl;
 
-// Create Post + Process Images + Extract Location + Save Post + Update User Stats
-    
+    // Create Post + Process Images + Extract Location + Save Post + Update User
+    // Stats
+
     @Override
     public ResponseEntity<?> addPostWithFile(InscriptionPostDto inscriptionPostDto, MultipartFile[] files,
             String usernameFromToken) {
 
-        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
+        User user = userRepository.findByEmail(usernameFromToken);
+        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         // Below Line To use for Threshold similarty
 
@@ -88,10 +90,7 @@ public class PostServiceImp implements PostService {
         // .filter(Objects::nonNull)
         // .findFirst();
 
-        User user = userRepository.findByEmail(usernameFromToken);
-
-        adjustUserImagesUploaded(user, ls.size());
-        userRepository.save(user);
+        updateUserImagesUploaded(user, ls.size());
 
         ObjectId postUserId = user.getId();
 
@@ -333,10 +332,9 @@ public class PostServiceImp implements PostService {
         if (!user.getId().toString().equals(postDelete.get().getUserId().toString())) {
             throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
         }
-        int deletedImageCount = getExistingImageIds(postDelete.get()).size();
-        getExistingImageIds(postDelete.get()).forEach(imagesDataRepo::deleteById);
-        adjustUserImagesUploaded(user, -deletedImageCount);
-        userRepository.save(user);
+        postDelete.get().getImages().getImage().stream().forEach(elem -> {
+            imagesDataRepo.deleteById(elem);
+        });
 
         publicPostDescriptionRepo.deleteAllByPostId(postId);
         inscriptionPostRepo.deleteById(new ObjectId(postId));
@@ -362,22 +360,21 @@ public class PostServiceImp implements PostService {
         return UserResponse.responseHandler("description deleted", HttpStatus.OK, true);
     }
 
-// Main function for the updation of the image
-//      edit post details
-//      delete some images
-//      upload new images
-//      keep at least one image in the post
+    // Main function for the updation of the image
+    // edit post details
+    // delete some images
+    // upload new images
+    // keep at least one image in the post
 
     @Override
     public ResponseEntity<?> updatePost(String usernameFromToken, InscriptionPostDto inscriptionPostDto,
             String postId, List<String> deletedImageIds, MultipartFile[] files) {
 
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
-        User user = userRepository.findByEmail(usernameFromToken);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, post.getUserId(), deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
@@ -394,32 +391,29 @@ public class PostServiceImp implements PostService {
         updatePostImages(post, updatedImageIds, deletableImageIds);
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
-        adjustUserImagesUploaded(user, newImages.size() - deletableImageIds.size());
-        userRepository.save(user);
         return UserResponse.responseHandler("post Updated ", HttpStatus.OK, true);
     }
 
     @Override
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
-        User user = userRepository.findByEmail(usernameFromToken);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, post.getUserId(), Collections.emptySet(),
+                true);
 
         List<String> updatedImageIds = getExistingImageIds(post);
         updatedImageIds.addAll(saveImages(post.getId(), newImages));
 
         updatePostImages(post, updatedImageIds, Collections.emptySet());
         inscriptionPostRepo.save(post);
-        adjustUserImagesUploaded(user, newImages.size());
-        userRepository.save(user);
+        updateUserImagesUploaded(usernameFromToken, newImages.size());
 
         return UserResponse.responseHandler("Images Added To Post Successfully", HttpStatus.OK, true);
     }
 
     @Override
-    public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId, List<String> deletedImageIds) {
+    public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId,
+            List<String> deletedImageIds) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
-        User user = userRepository.findByEmail(usernameFromToken);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, true);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
@@ -431,8 +425,7 @@ public class PostServiceImp implements PostService {
 
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
-        adjustUserImagesUploaded(user, -deletableImageIds.size());
-        userRepository.save(user);
+        updateUserImagesUploaded(usernameFromToken, -deletableImageIds.size());
 
         return UserResponse.responseHandler("Images Deleted From Post Successfully", HttpStatus.OK, true);
     }
@@ -466,25 +459,17 @@ public class PostServiceImp implements PostService {
 
         List<InscriptionPost> allPost = inscriptionPostRepo.findAll();
 
-        counts.put("totalUsers", Math.toIntExact(userRepository.count()));
-        counts.put("totalPosts", Math.toIntExact(inscriptionPostRepo.count()));
-        counts.put("totalImages", Math.toIntExact(imagesDataRepo.count()));
+        counts.put("totalUsers", userRepository.findAll().size());
+        counts.put("totalPosts", allPost.size());
         counts.put("totalGeoTaggedPosts",
                 (int) allPost.stream().filter(el -> el.getDescription().getGeolocation() != null).count());
-        counts.put("totalTranslations", (int) allPost.stream()
-                .map(InscriptionPost::getDescription)
-                .filter(Objects::nonNull)
-                .map(InscriptionPost.Description::getEnglishTranslation)
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(translation -> !translation.isEmpty())
-                .count());
+        counts.put("totalTranslations", 0);
 
         return UserResponse.responseHandler("Dashboard Counts", HttpStatus.OK, counts);
     }
 
-    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, Set<String> replaceableImageIds,
-            boolean filesRequired) {
+    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, ObjectId userId,
+            Set<String> replaceableImageIds, boolean filesRequired) {
         if (files == null || files.length == 0) {
             if (filesRequired) {
                 throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
@@ -498,22 +483,36 @@ public class PostServiceImp implements PostService {
         if (ls.size() == 0) {
             throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
         }
-
+        // here is the logic where we find the count of image in databse if count is
+        // more than 1 then it is duplicate image by same user
         if (ls.size() != ls.stream().map(ImageMetaAndInfo::getPHash).distinct().count()) {
             throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        boolean imageAlreadyExists = ls.stream().anyMatch(image -> {
-            Optional<ImagesData> existingImage = imagesDataRepo
-                    .findFirstByMetadata_ImageHashValue(image.getPHash().getHashValue().toString());
-            return existingImage.isPresent() && !replaceableImageIds.contains(existingImage.get().getId());
-        });
+        boolean imageAlreadyExists = ls.stream()
+                .anyMatch(image -> isImageAlreadyUploadedByUser(userId,
+                        image.getPHash().getHashValue().toString(), replaceableImageIds));
 
         if (imageAlreadyExists) {
-            throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
+            throw new StoneInscriptionException("Image Already Uploaded", HttpStatus.CONFLICT);
         }
 
         return ls;
+    }
+
+    private boolean isImageAlreadyUploadedByUser(ObjectId userId, String imageHashValue,
+            Set<String> replaceableImageIds) {
+        if (userId == null) {
+            return false;
+        }
+
+        return imagesDataRepo.findAllByMetadata_ImageHashValue(imageHashValue).stream()
+                .filter(existingImage -> !replaceableImageIds.contains(existingImage.getId()))
+                .map(ImagesData::getPostId)
+                .filter(Objects::nonNull)
+                .map(inscriptionPostRepo::findById)
+                .flatMap(Optional::stream)
+                .anyMatch(post -> userId.equals(post.getUserId()));
     }
 
     private List<String> saveImages(ObjectId postId, List<ImageMetaAndInfo> images) {
@@ -598,9 +597,23 @@ public class PostServiceImp implements PostService {
         imageIds.forEach(imagesDataRepo::deleteById);
     }
 
-    private void adjustUserImagesUploaded(User user, int delta) {
-        int currentCount = user.getImagesUploaded() == null ? 0 : user.getImagesUploaded();
-        user.setImagesUploaded(Math.max(0, currentCount + delta));
+    private void updateUserImagesUploaded(String usernameFromToken, int delta) {
+        if (delta == 0) {
+            return;
+        }
+
+        User user = userRepository.findByEmail(usernameFromToken);
+        updateUserImagesUploaded(user, delta);
+    }
+
+    private void updateUserImagesUploaded(User user, int delta) {
+        if (user == null || delta == 0) {
+            return;
+        }
+
+        int currentImagesUploaded = user.getImagesUploaded() == null ? 0 : user.getImagesUploaded();
+        user.setImagesUploaded(Math.max(0, currentImagesUploaded + delta));
+        userRepository.save(user);
     }
 
     private List<String> sanitizeImageIds(List<String> imageIds) {
