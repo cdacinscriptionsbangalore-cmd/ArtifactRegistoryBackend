@@ -60,7 +60,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         } catch (Exception ex) {
             request.setAttribute("exception", ex);
-           
+
             throw ex;
         }
 
@@ -86,8 +86,10 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             // }
 
         } else {
-            throw new StoneInscriptionException("Invalid Token Request Bearer not found ", HttpStatus.BAD_REQUEST);
-
+            // PRODUCTION: uncomment throw, comment return null
+            throw new StoneInscriptionException("Invalid Token Request Bearer not found",
+                    HttpStatus.BAD_REQUEST);
+            // return null; // TESTING ONLY
         }
 
     }

@@ -45,7 +45,7 @@ public class PostController {
     public ResponseEntity<?> addPostWithFile(
             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
             HttpServletRequest request,
-             @RequestPart("files") MultipartFile... files) throws IOException {
+            @RequestPart("files") MultipartFile... files) throws IOException {
         files = getNonEmptyFiles(files);
 
         if (files.length == 0) {
@@ -72,7 +72,7 @@ public class PostController {
     }
 
     @GetMapping("/public/images/{id}")
-    public ResponseEntity<InputStreamResource> getImage(@PathVariable String id) {
+    public ResponseEntity<InputStreamResource> getImage(@PathVariable("id") String id) {
 
         return postService.getImages(id);
 
@@ -194,8 +194,9 @@ public class PostController {
         return postService.descriptionDelete(jwtUtil.getUsernameFromToken(token), descriptionId);
 
     }
-// Updated this function for all the updation 
-// Helps logged user to create a post and upload images 
+
+    // Updated this function for all the updation
+    // Helps logged user to create a post and upload images
     @PostMapping("/updatePost")
     @Secured("user")
     public ResponseEntity<?> updatePost(HttpServletRequest request,
@@ -260,69 +261,74 @@ public class PostController {
 
     // @PostMapping("/test/updatePost/{email}")
     // public ResponseEntity<?> updatePostForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestParam String postId,
-    //         @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
-    //         @RequestPart(value = "files", required = false) MultipartFile... files) {
+    // @PathVariable String email,
+    // @RequestPart(value = "post", required = false) InscriptionPostDto
+    // InscriptionPostDto,
+    // @RequestParam String postId,
+    // @RequestParam(value = "deletedImageIds", required = false) List<String>
+    // deletedImageIds,
+    // @RequestPart(value = "files", required = false) MultipartFile... files) {
 
-    //     files = getNonEmptyFiles(files);
-    //     validateFiles(files);
+    // files = getNonEmptyFiles(files);
+    // validateFiles(files);
 
-    //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
+    // return postService.updatePost(email, InscriptionPostDto, postId,
+    // deletedImageIds, files);
     // }
 
     // @PostMapping("/test/addPostWithFile/{email}")
     // public ResponseEntity<?> addPostWithFileForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestPart("files") MultipartFile... files) throws IOException {
+    // @PathVariable("email") String email,
+    // @RequestPart(value = "post", required = false) InscriptionPostDto
+    // InscriptionPostDto,
+    // @RequestPart("files") MultipartFile... files) throws IOException {
 
-    //     files = getNonEmptyFiles(files);
+    // files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+    // if (files.length == 0) {
+    // throw new StoneInscriptionException("No File Uploaded",
+    // HttpStatus.BAD_REQUEST);
+    // }
 
-    //     validateFiles(files);
+    // validateFiles(files);
 
-    //     return postService.addPostWithFile(InscriptionPostDto, files, email);
+    // return postService.addPostWithFile(InscriptionPostDto, files, email);
     // }
 
     // @PostMapping("/test/addImagesToPost/{email}")
     // public ResponseEntity<?> addImagesToPostForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId,
-    //         @RequestPart("files") MultipartFile... files) {
+    // @PathVariable String email,
+    // @RequestParam String postId,
+    // @RequestPart("files") MultipartFile... files) {
 
-    //     files = getNonEmptyFiles(files);
+    // files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+    // if (files.length == 0) {
+    // throw new StoneInscriptionException("No File Uploaded",
+    // HttpStatus.BAD_REQUEST);
+    // }
 
-    //     validateFiles(files);
+    // validateFiles(files);
 
-    //     return postService.addImagesToPost(email, postId, files);
+    // return postService.addImagesToPost(email, postId, files);
     // }
 
     // @PostMapping("/test/deleteImagesFromPost/{email}")
     // public ResponseEntity<?> deleteImagesFromPostForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId,
-    //         @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
+    // @PathVariable String email,
+    // @RequestParam String postId,
+    // @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
 
-    //     return postService.deleteImagesFromPost(email, postId, deletedImageIds);
+    // return postService.deleteImagesFromPost(email, postId, deletedImageIds);
     // }
 
     // @PostMapping("/test/postDelete/{email}")
     // public ResponseEntity<?> postDeleteForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId) {
+    // @PathVariable String email,
+    // @RequestParam String postId) {
 
-    //     return postService.postDelete(email, postId);
+    // return postService.postDelete(email, postId);
     // }
-
 
     private MultipartFile[] getNonEmptyFiles(MultipartFile[] files) {
         if (files == null) {
