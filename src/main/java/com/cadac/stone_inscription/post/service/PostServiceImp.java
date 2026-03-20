@@ -42,6 +42,8 @@ import com.cadac.stone_inscription.util.UserResponse;
 @Service
 public class PostServiceImp implements PostService {
 
+    private static final int MAX_IMAGES_PER_POST = 16;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -67,8 +69,9 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addPostWithFile(InscriptionPostDto inscriptionPostDto, MultipartFile[] files,
             String usernameFromToken) {
 
-        User user = userRepository.findByEmail(usernameFromToken);
-        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
+        ensureMaximumImageCount(0, 0, files.length);
+        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
+        ensureMaximumImageCount(0, 0, ls.size());
 
         // Below Line To use for Threshold similarty
 
@@ -374,9 +377,11 @@ public class PostServiceImp implements PostService {
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, post.getUserId(), deletableImageIds, false);
+        ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), files == null ? 0 : files.length);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
+        ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
         if (inscriptionPostDto != null) {
             post.setDescription(PostMapper.toEntityDescription(inscriptionPostDto.getDescription()));
@@ -397,8 +402,10 @@ public class PostServiceImp implements PostService {
     @Override
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, post.getUserId(), Collections.emptySet(),
-                true);
+        User user = userRepository.findByEmail(usernameFromToken);
+        ensureMaximumImageCount(getExistingImageIds(post).size(), 0, files.length);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+        ensureMaximumImageCount(getExistingImageIds(post).size(), 0, newImages.size());
 
         List<String> updatedImageIds = getExistingImageIds(post);
         updatedImageIds.addAll(saveImages(post.getId(), newImages));
@@ -571,6 +578,16 @@ public class PostServiceImp implements PostService {
 
         if (finalImageCount < 1) {
             throw new StoneInscriptionException("Post should have at least one image", HttpStatus.BAD_REQUEST);
+        }
+    }
+// ensuring the max image should be only 16
+
+    private void ensureMaximumImageCount(int existingImageCount, int deletedImageCount, int newImageCount) {
+        int finalImageCount = existingImageCount - deletedImageCount + newImageCount;
+
+        if (finalImageCount > MAX_IMAGES_PER_POST) {
+            throw new StoneInscriptionException("A post can contain at most " + MAX_IMAGES_PER_POST + " images",
+                    HttpStatus.BAD_REQUEST);
         }
     }
 
