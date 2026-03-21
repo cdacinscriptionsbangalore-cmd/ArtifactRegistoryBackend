@@ -75,7 +75,9 @@ public class PostServiceImp implements PostService {
             String usernameFromToken) {
 
         ensureMaximumImageCount(0, 0, files.length);
-        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
+
+        User user = userRepository.findByEmail(usernameFromToken);
+        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, user.getId(), Collections.<String>emptySet(), true);
         ensureMaximumImageCount(0, 0, ls.size());
 
         // Below Line To use for Threshold similarty
@@ -98,7 +100,6 @@ public class PostServiceImp implements PostService {
         // .filter(Objects::nonNull)
         // .findFirst();
 
-        User user = userRepository.findByEmail(usernameFromToken);
         ContentModerationResult moderationResult = moderatePostContent(inscriptionPostDto);
 
         user.setImagesUploaded(user.getImagesUploaded() + ls.size());
@@ -406,7 +407,7 @@ public class PostServiceImp implements PostService {
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
         ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), files == null ? 0 : files.length);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, post.getUserId(), deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
         ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
@@ -437,7 +438,7 @@ public class PostServiceImp implements PostService {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
         User user = userRepository.findByEmail(usernameFromToken);
         ensureMaximumImageCount(getExistingImageIds(post).size(), 0, files.length);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), Collections.<String>emptySet(), true);
         ensureMaximumImageCount(getExistingImageIds(post).size(), 0, newImages.size());
 
         List<String> updatedImageIds = getExistingImageIds(post);
