@@ -4,13 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
-
-import java.util.List;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import static org.mockito.Mockito.when;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClientException;
@@ -18,7 +15,6 @@ import org.springframework.web.client.RestClientException;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.moderation.client.N8nModerationClient;
 import com.cadac.stone_inscription.moderation.config.ContentModerationProperties;
-import com.cadac.stone_inscription.moderation.dto.ContentModerationResponseDto;
 import com.cadac.stone_inscription.moderation.model.ContentModerationResult;
 
 class ContentModerationServiceTest {
@@ -39,14 +35,9 @@ class ContentModerationServiceTest {
 
     @Test
     void shouldApproveContentWhenDecisionIsAllowAndConfidenceMeetsThreshold() {
+        String jsonResponse = "[{\"decision\":\"ALLOW\",\"label\":\"SAFE\",\"confidence\":0.92,\"status\":\"approved\",\"reason\":\"safe\"}]";
         when(n8nModerationClient.moderate(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(List.of(ContentModerationResponseDto.builder()
-                        .decision("ALLOW")
-                        .label("SAFE")
-                        .confidence(0.92)
-                        .status("approved")
-                        .reason("safe")
-                        .build()));
+                .thenReturn(jsonResponse);
 
         ContentModerationResult result = contentModerationService.moderate("Title", "History", "Safe content");
 
@@ -57,14 +48,9 @@ class ContentModerationServiceTest {
 
     @Test
     void shouldRejectContentWhenConfidenceIsBelowThreshold() {
+        String jsonResponse = "[{\"decision\":\"ALLOW\",\"label\":\"SAFE\",\"confidence\":0.6,\"status\":\"approved\",\"reason\":\"low confidence\"}]";
         when(n8nModerationClient.moderate(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(List.of(ContentModerationResponseDto.builder()
-                        .decision("ALLOW")
-                        .label("SAFE")
-                        .confidence(0.6)
-                        .status("approved")
-                        .reason("low confidence")
-                        .build()));
+                .thenReturn(jsonResponse);
 
         ContentModerationResult result = contentModerationService.moderate("Title", "History", "Borderline content");
 
