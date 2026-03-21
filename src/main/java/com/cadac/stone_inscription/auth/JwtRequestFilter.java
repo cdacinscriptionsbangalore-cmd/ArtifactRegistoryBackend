@@ -1,13 +1,15 @@
 package com.cadac.stone_inscription.auth;
 
+import java.io.IOException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
@@ -15,8 +17,6 @@ import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import org.springframework.util.StringUtils;
 
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
@@ -60,7 +60,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         } catch (Exception ex) {
             request.setAttribute("exception", ex);
-           
+
             throw ex;
         }
 
@@ -86,8 +86,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             // }
 
         } else {
-            throw new StoneInscriptionException("Invalid Token Request Bearer not found ", HttpStatus.BAD_REQUEST);
-
+            throw new StoneInscriptionException("Invalid Token Request Bearer not found ",
+            HttpStatus.BAD_REQUEST);
+            // return null;
         }
 
     }

@@ -120,6 +120,8 @@ public class UserController {
 
     //     return userService.updateProfile(email, updateProfileRequest);
     // }
+    //     return userService.updateProfile(email, updateProfileRequest);
+    // }
 
     /**
      * TEST ONLY: Upload profile image directly by email without JWT.
@@ -132,6 +134,8 @@ public class UserController {
 
     //     return userService.uploadProfileImage(email, file);
     // }
+    //     return userService.uploadProfileImage(email, file);
+    // }
 
     /**
      * TEST ONLY: Upload cover image directly by email without JWT.
@@ -142,6 +146,8 @@ public class UserController {
     //         @PathVariable String email,
     //         @RequestPart("file") MultipartFile file) {
 
+    //     return userService.uploadCoverImage(email, file);
+    // }
     //     return userService.uploadCoverImage(email, file);
     // }
 
