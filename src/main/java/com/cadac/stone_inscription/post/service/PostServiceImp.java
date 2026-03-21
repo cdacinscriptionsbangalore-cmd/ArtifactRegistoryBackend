@@ -27,6 +27,8 @@ import com.cadac.stone_inscription.entity.InscriptionPost;
 import com.cadac.stone_inscription.entity.PublicPostDescription;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.moderation.model.ContentModerationResult;
+import com.cadac.stone_inscription.moderation.service.ContentModerationService;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
 import com.cadac.stone_inscription.post.dto.PublicPostUserDescriptionDto;
 import com.cadac.stone_inscription.post.mapper.PostMapper;
@@ -41,6 +43,8 @@ import com.cadac.stone_inscription.util.UserResponse;
 
 @Service
 public class PostServiceImp implements PostService {
+
+    private static final int MAX_IMAGES_PER_POST = 16;
 
     @Autowired
     private UserRepository userRepository;
@@ -57,16 +61,22 @@ public class PostServiceImp implements PostService {
     @Autowired
     private PublicPostDescriptionRepo publicPostDescriptionRepo;
 
+    @Autowired
+    private ContentModerationService contentModerationService;
+
     @Value("${app.backend.url}")
     private String backendUrl;
 
-// Create Post + Process Images + Extract Location + Save Post + Update User Stats
-    
+    // Create Post + Process Images + Extract Location + Save Post + Update User
+    // Stats
+
     @Override
     public ResponseEntity<?> addPostWithFile(InscriptionPostDto inscriptionPostDto, MultipartFile[] files,
             String usernameFromToken) {
 
+        ensureMaximumImageCount(0, 0, files.length);
         List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
+        ensureMaximumImageCount(0, 0, ls.size());
 
         // Below Line To use for Threshold similarty
 
@@ -89,9 +99,9 @@ public class PostServiceImp implements PostService {
         // .findFirst();
 
         User user = userRepository.findByEmail(usernameFromToken);
+        ContentModerationResult moderationResult = moderatePostContent(inscriptionPostDto);
 
         user.setImagesUploaded(user.getImagesUploaded() + ls.size());
-
         userRepository.save(user);
 
         ObjectId postUserId = user.getId();
@@ -101,6 +111,12 @@ public class PostServiceImp implements PostService {
         if (inscriptionPostDto != null) {
             inscriptionPost = PostMapper.toEntity(inscriptionPostDto);
         }
+
+        if (inscriptionPost.getDescription() == null) {
+            inscriptionPost.setDescription(InscriptionPost.Description.builder().build());
+        }
+
+        inscriptionPost.getDescription().setModeration(moderationResult.toContentModeration());
 
         inscriptionPost.setUserId(postUserId);
 
@@ -155,7 +171,7 @@ public class PostServiceImp implements PostService {
         }
 
         inscriptionPostRepo.save(inscriptionPost);
-        return UserResponse.responseHandler("Images Uploaded Sucessfully", HttpStatus.OK, true);
+        return UserResponse.responseHandler("Post saved successfully after content moderation.", HttpStatus.OK, true);
     }
 
     @Override
@@ -213,15 +229,21 @@ public class PostServiceImp implements PostService {
 
         User user = userRepository.findByEmail(usernameFromToken);
 
-        if (inscriptionPostRepo.findById(new ObjectId(postId)).isEmpty()) {
+        Optional<InscriptionPost> post = inscriptionPostRepo.findById(new ObjectId(postId));
+
+        if (post.isEmpty()) {
             throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
         }
 
+        ContentModerationResult moderationResult = moderateCommentContent(post.get(), discription);
+
         publicPostDescriptionRepo.save(PublicPostDescription.builder().description(discription)
                 .postId(new ObjectId(postId)).userId(user.getId())
-                .userImageUrl(user.getProfileImage()).username(user.getName()).build());
+                .userImageUrl(user.getProfileImage()).username(user.getName())
+                .moderation(moderationResult.toContentModeration()).build());
 
-        return UserResponse.responseHandler("Discription Added sucessfully", HttpStatus.OK, true);
+        return UserResponse.responseHandler("Description saved successfully after content moderation.", HttpStatus.OK,
+                true);
     }
 
     @Override
@@ -244,11 +266,18 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Unprocesable request Unauthorized", HttpStatus.UNAUTHORIZED);
         }
 
+        InscriptionPost parentPost = inscriptionPostRepo.findById(postDiscription.get().getPostId())
+                .orElseThrow(() -> new StoneInscriptionException("Parent post not found", HttpStatus.BAD_REQUEST));
+
+        ContentModerationResult moderationResult = moderateCommentContent(parentPost, discription);
+
         postDiscription.get().setDescription(discription);
+        postDiscription.get().setModeration(moderationResult.toContentModeration());
 
         publicPostDescriptionRepo.save(postDiscription.get());
 
-        return UserResponse.responseHandler("Updated Discription", HttpStatus.OK, true);
+        return UserResponse.responseHandler("Description updated successfully after content moderation.", HttpStatus.OK,
+                true);
 
     }
 
@@ -362,11 +391,11 @@ public class PostServiceImp implements PostService {
         return UserResponse.responseHandler("description deleted", HttpStatus.OK, true);
     }
 
-// Main function for the updation of the image
-//      edit post details
-//      delete some images
-//      upload new images
-//      keep at least one image in the post
+    // Main function for the updation of the image
+    // edit post details
+    // delete some images
+    // upload new images
+    // keep at least one image in the post
 
     @Override
     public ResponseEntity<?> updatePost(String usernameFromToken, InscriptionPostDto inscriptionPostDto,
@@ -376,15 +405,22 @@ public class PostServiceImp implements PostService {
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
+        ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), files == null ? 0 : files.length);
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
+        ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
         if (inscriptionPostDto != null) {
             post.setDescription(PostMapper.toEntityDescription(inscriptionPostDto.getDescription()));
             post.setScript(inscriptionPostDto.getScript());
             post.setTopic(inscriptionPostDto.getTopic());
             post.setType(inscriptionPostDto.getType());
+            ContentModerationResult moderationResult = moderatePostContent(inscriptionPostDto);
+            if (post.getDescription() == null) {
+                post.setDescription(InscriptionPost.Description.builder().build());
+            }
+            post.getDescription().setModeration(moderationResult.toContentModeration());
         }
 
         List<String> updatedImageIds = removeDeletedImageIds(existingImageIds, deletableImageIds);
@@ -393,25 +429,30 @@ public class PostServiceImp implements PostService {
         updatePostImages(post, updatedImageIds, deletableImageIds);
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
-        return UserResponse.responseHandler("post Updated ", HttpStatus.OK, true);
+        return UserResponse.responseHandler("Post updated successfully after content moderation.", HttpStatus.OK, true);
     }
 
     @Override
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
+        User user = userRepository.findByEmail(usernameFromToken);
+        ensureMaximumImageCount(getExistingImageIds(post).size(), 0, files.length);
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+        ensureMaximumImageCount(getExistingImageIds(post).size(), 0, newImages.size());
 
         List<String> updatedImageIds = getExistingImageIds(post);
         updatedImageIds.addAll(saveImages(post.getId(), newImages));
 
         updatePostImages(post, updatedImageIds, Collections.emptySet());
         inscriptionPostRepo.save(post);
+        updateUserImagesUploaded(usernameFromToken, newImages.size());
 
         return UserResponse.responseHandler("Images Added To Post Successfully", HttpStatus.OK, true);
     }
 
     @Override
-    public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId, List<String> deletedImageIds) {
+    public ResponseEntity<?> deleteImagesFromPost(String usernameFromToken, String postId,
+            List<String> deletedImageIds) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, true);
@@ -424,6 +465,7 @@ public class PostServiceImp implements PostService {
 
         inscriptionPostRepo.save(post);
         deleteImagesByIds(deletableImageIds);
+        updateUserImagesUploaded(usernameFromToken, -deletableImageIds.size());
 
         return UserResponse.responseHandler("Images Deleted From Post Successfully", HttpStatus.OK, true);
     }
@@ -466,8 +508,8 @@ public class PostServiceImp implements PostService {
         return UserResponse.responseHandler("Dashboard Counts", HttpStatus.OK, counts);
     }
 
-    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, Set<String> replaceableImageIds,
-            boolean filesRequired) {
+    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, ObjectId userId,
+            Set<String> replaceableImageIds, boolean filesRequired) {
         if (files == null || files.length == 0) {
             if (filesRequired) {
                 throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
@@ -481,22 +523,36 @@ public class PostServiceImp implements PostService {
         if (ls.size() == 0) {
             throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
         }
-
+        // here is the logic where we find the count of image in databse if count is
+        // more than 1 then it is duplicate image by same user
         if (ls.size() != ls.stream().map(ImageMetaAndInfo::getPHash).distinct().count()) {
             throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        boolean imageAlreadyExists = ls.stream().anyMatch(image -> {
-            Optional<ImagesData> existingImage = imagesDataRepo
-                    .findFirstByMetadata_ImageHashValue(image.getPHash().getHashValue().toString());
-            return existingImage.isPresent() && !replaceableImageIds.contains(existingImage.get().getId());
-        });
+        boolean imageAlreadyExists = ls.stream()
+                .anyMatch(image -> isImageAlreadyUploadedByUser(userId,
+                        image.getPHash().getHashValue().toString(), replaceableImageIds));
 
         if (imageAlreadyExists) {
-            throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
+            throw new StoneInscriptionException("Image Already Uploaded", HttpStatus.CONFLICT);
         }
 
         return ls;
+    }
+
+    private boolean isImageAlreadyUploadedByUser(ObjectId userId, String imageHashValue,
+            Set<String> replaceableImageIds) {
+        if (userId == null) {
+            return false;
+        }
+
+        return imagesDataRepo.findAllByMetadata_ImageHashValue(imageHashValue).stream()
+                .filter(existingImage -> !replaceableImageIds.contains(existingImage.getId()))
+                .map(ImagesData::getPostId)
+                .filter(Objects::nonNull)
+                .map(inscriptionPostRepo::findById)
+                .flatMap(Optional::stream)
+                .anyMatch(post -> userId.equals(post.getUserId()));
     }
 
     private List<String> saveImages(ObjectId postId, List<ImageMetaAndInfo> images) {
@@ -557,6 +613,16 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Post should have at least one image", HttpStatus.BAD_REQUEST);
         }
     }
+// ensuring the max image should be only 16
+
+    private void ensureMaximumImageCount(int existingImageCount, int deletedImageCount, int newImageCount) {
+        int finalImageCount = existingImageCount - deletedImageCount + newImageCount;
+
+        if (finalImageCount > MAX_IMAGES_PER_POST) {
+            throw new StoneInscriptionException("A post can contain at most " + MAX_IMAGES_PER_POST + " images",
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
 
     private List<String> removeDeletedImageIds(List<String> existingImageIds, Set<String> deletableImageIds) {
         return existingImageIds.stream()
@@ -581,6 +647,25 @@ public class PostServiceImp implements PostService {
         imageIds.forEach(imagesDataRepo::deleteById);
     }
 
+    private void updateUserImagesUploaded(String usernameFromToken, int delta) {
+        if (delta == 0) {
+            return;
+        }
+
+        User user = userRepository.findByEmail(usernameFromToken);
+        updateUserImagesUploaded(user, delta);
+    }
+
+    private void updateUserImagesUploaded(User user, int delta) {
+        if (user == null || delta == 0) {
+            return;
+        }
+
+        int currentImagesUploaded = user.getImagesUploaded() == null ? 0 : user.getImagesUploaded();
+        user.setImagesUploaded(Math.max(0, currentImagesUploaded + delta));
+        userRepository.save(user);
+    }
+
     private List<String> sanitizeImageIds(List<String> imageIds) {
         if (imageIds == null) {
             return List.of();
@@ -592,6 +677,55 @@ public class PostServiceImp implements PostService {
                 .filter(id -> !id.isEmpty())
                 .distinct()
                 .toList();
+    }
+
+    private ContentModerationResult moderatePostContent(InscriptionPostDto inscriptionPostDto) {
+        if (inscriptionPostDto == null || inscriptionPostDto.getDescription() == null) {
+            throw new StoneInscriptionException("Post content is required for moderation.", HttpStatus.BAD_REQUEST);
+        }
+
+        String title = safeValue(inscriptionPostDto.getDescription().getTitle());
+        String topic = requiredValue(inscriptionPostDto.getTopic(), "Topic is required for content moderation.");
+        String description = requiredValue(inscriptionPostDto.getDescription().getDescription(),
+                "Description is required for content moderation.");
+
+        ContentModerationResult moderationResult = contentModerationService.moderate(title, topic, description);
+        ensureModerationApproved(moderationResult);
+        return moderationResult;
+    }
+
+    private ContentModerationResult moderateCommentContent(InscriptionPost post, String description) {
+        String title = "";
+        if (post.getDescription() != null) {
+            title = safeValue(post.getDescription().getTitle());
+        }
+
+        String topic = requiredValue(post.getTopic(), "Topic is required for content moderation.");
+        String moderationDescription = requiredValue(description, "Description is required for content moderation.");
+
+        ContentModerationResult moderationResult = contentModerationService.moderate(title, topic,
+                moderationDescription);
+        ensureModerationApproved(moderationResult);
+        return moderationResult;
+    }
+
+    private void ensureModerationApproved(ContentModerationResult moderationResult) {
+        if (!moderationResult.isApproved()) {
+            throw new StoneInscriptionException(contentModerationService.buildRejectionMessage(moderationResult),
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    private String requiredValue(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new StoneInscriptionException(message, HttpStatus.BAD_REQUEST);
+        }
+
+        return value.trim();
+    }
+
+    private String safeValue(String value) {
+        return value == null ? "" : value.trim();
     }
 
 }

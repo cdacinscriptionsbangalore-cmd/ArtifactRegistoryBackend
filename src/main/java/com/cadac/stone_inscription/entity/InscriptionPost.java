@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -148,6 +150,10 @@ public class InscriptionPost {
         @JsonProperty("upvote")
         @Builder.Default
         private Integer upvote = 0;
+
+        @Field("moderation")
+        @JsonProperty("moderation")
+        private ContentModeration moderation;
 
         @Field("geolocation")
         @JsonProperty("geolocation")

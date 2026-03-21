@@ -104,46 +104,52 @@ public class UserController {
      * TEST ONLY: Get profile directly by email without JWT.
      * GET /api/v1/user/test/profile/{email}
      */
-    @GetMapping("/test/profile/{email}")
-    public ResponseEntity<?> getProfileForTest(@PathVariable String email) {
-        return userService.getProfile(email);
-    }
+    // @GetMapping("/test/profile/{email}")
+    // public ResponseEntity<?> getProfileForTest(@PathVariable String email) {
+    //     return userService.getProfile(email);
+    // }
 
     /**
      * TEST ONLY: Update profile directly by email without JWT.
      * POST /api/v1/user/test/updateProfile/{email}
      */
-    @PostMapping("/test/updateProfile/{email}")
-    public ResponseEntity<?> updateProfileForTest(
-            @PathVariable String email,
-            @Valid @RequestBody UpdateProfileRequest updateProfileRequest) {
+    // @PostMapping("/test/updateProfile/{email}")
+    // public ResponseEntity<?> updateProfileForTest(
+    //         @PathVariable String email,
+    //         @Valid @RequestBody UpdateProfileRequest updateProfileRequest) {
 
-        return userService.updateProfile(email, updateProfileRequest);
-    }
+    //     return userService.updateProfile(email, updateProfileRequest);
+    // }
+    //     return userService.updateProfile(email, updateProfileRequest);
+    // }
 
     /**
      * TEST ONLY: Upload profile image directly by email without JWT.
      * POST /api/v1/user/test/uploadProfileImage/{email}
      */
-    @PostMapping("/test/uploadProfileImage/{email}")
-    public ResponseEntity<?> uploadProfileImageForTest(
-            @PathVariable String email,
-            @RequestPart("file") MultipartFile file) {
+    // @PostMapping("/test/uploadProfileImage/{email}")
+    // public ResponseEntity<?> uploadProfileImageForTest(
+    //         @PathVariable String email,
+    //         @RequestPart("file") MultipartFile file) {
 
-        return userService.uploadProfileImage(email, file);
-    }
+    //     return userService.uploadProfileImage(email, file);
+    // }
+    //     return userService.uploadProfileImage(email, file);
+    // }
 
     /**
      * TEST ONLY: Upload cover image directly by email without JWT.
      * POST /api/v1/user/test/uploadCoverImage/{email}
      */
-    @PostMapping("/test/uploadCoverImage/{email}")
-    public ResponseEntity<?> uploadCoverImageForTest(
-            @PathVariable String email,
-            @RequestPart("file") MultipartFile file) {
+    // @PostMapping("/test/uploadCoverImage/{email}")
+    // public ResponseEntity<?> uploadCoverImageForTest(
+    //         @PathVariable String email,
+    //         @RequestPart("file") MultipartFile file) {
 
-        return userService.uploadCoverImage(email, file);
-    }
+    //     return userService.uploadCoverImage(email, file);
+    // }
+    //     return userService.uploadCoverImage(email, file);
+    // }
 
     /**
      * Helper method to extract email from JWT token
