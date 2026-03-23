@@ -93,18 +93,15 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
                         CustomOAuth2SuccessHandler successHandler) throws Exception {
 
                 http
-                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                                 // ✅ Disable CSRF completely for JWT stateless API
                                 .csrf(AbstractHttpConfigurer::disable)
 
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
-                                                // TODO: PRODUCTION — uncomment .authenticated() and comment
-                                                // .permitAll() below
                                                 .requestMatchers("/api/v1/**", "/post/**").authenticated()
-                                                // .requestMatchers("/api/v1/**", "/post/**").permitAll() // TESTING
-                                                // ONLY
+                                                //  .requestMatchers("/api/v1/**", "/post/**").permitAll()
                                                 .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
                                                 .anyRequest().permitAll())
 

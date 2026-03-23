@@ -1,7 +1,6 @@
 package com.cadac.stone_inscription.post.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.cadac.stone_inscription.moderation.model.ContentModeration;
 import lombok.*;
 
 import java.util.Date;
@@ -36,9 +35,6 @@ public class PublicPostUserDescriptionDto {
 
     @JsonProperty("upvote")
     private Integer upvote;
-
-    @JsonProperty("moderation")
-    private ContentModeration moderation;
 
     @JsonProperty("userVote")
     private List<UserVoteDto> userVote;

@@ -22,7 +22,6 @@ public class PublicPostDescriptionMapper {
                 .userImageUrl(entity.getUserImageUrl())
                 .description(entity.getDescription())
                 .upvote(entity.getUpvote())
-                .moderation(entity.getModeration())
                 .userVote(toUserVoteDtoList(entity.getUserVote()))
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
