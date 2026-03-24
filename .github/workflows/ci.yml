@@ -34,7 +34,7 @@ jobs:
     #   run: mvn test
 
     - name: Build Docker image
-      run: docker build -t nayanmoni458/stone-inscription:backend-new .
+      run: docker build -t nayanmoni458/stoneinscription:backend-new .
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
@@ -43,4 +43,5 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Push Docker image
-      run: docker push nayanmoni458/stone-inscription:backend-new
+      run: docker push nayanmoni458/stoneinscription:backend-new
+      
