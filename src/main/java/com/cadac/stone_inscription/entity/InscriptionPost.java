@@ -3,6 +3,7 @@ package com.cadac.stone_inscription.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -143,6 +144,10 @@ public class InscriptionPost {
         @Field("englishTranslation")
         @JsonProperty("englishTranslation")
         private String englishTranslation;
+
+        @Field("moderation")
+        @JsonProperty("moderation")
+        private ContentModeration moderation;
 
         @Field("upvote")
         @JsonProperty("upvote")

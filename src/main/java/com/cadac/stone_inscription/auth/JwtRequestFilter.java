@@ -87,7 +87,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         } else {
             throw new StoneInscriptionException("Invalid Token Request Bearer not found ", HttpStatus.BAD_REQUEST);
-
+            // return null; 
         }
 
     }

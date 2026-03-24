@@ -3,6 +3,7 @@ package com.cadac.stone_inscription.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
 
 import lombok.*;
 import org.bson.types.ObjectId;
@@ -50,6 +51,10 @@ public class PublicPostDescription {
     @Field("description")
     @JsonProperty("description")
     private String description;
+
+    @Field("moderation")
+    @JsonProperty("moderation")
+    private ContentModeration moderation;
 
     @Field("upvote")
     @JsonProperty("upvote")

@@ -27,6 +27,9 @@ import com.cadac.stone_inscription.entity.InscriptionPost;
 import com.cadac.stone_inscription.entity.PublicPostDescription;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
+import com.cadac.stone_inscription.moderation.model.ContentModerationResult;
+import com.cadac.stone_inscription.moderation.service.ContentModerationService;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
 import com.cadac.stone_inscription.post.dto.PublicPostUserDescriptionDto;
 import com.cadac.stone_inscription.post.mapper.PostMapper;
@@ -56,6 +59,9 @@ public class PostServiceImp implements PostService {
 
     @Autowired
     private PublicPostDescriptionRepo publicPostDescriptionRepo;
+
+    @Autowired
+    private ContentModerationService contentModerationService;
 
     @Value("${app.backend.url}")
     private String backendUrl;
@@ -90,17 +96,26 @@ public class PostServiceImp implements PostService {
 
         User user = userRepository.findByEmail(usernameFromToken);
 
-        adjustUserImagesUploaded(user, ls.size());
-        userRepository.save(user);
-
-        ObjectId postUserId = user.getId();
-
         InscriptionPost inscriptionPost = new InscriptionPost();
 
         if (inscriptionPostDto != null) {
             inscriptionPost = PostMapper.toEntity(inscriptionPostDto);
         }
 
+        ContentModeration moderation = moderatePostContent(
+                extractTitle(inscriptionPost),
+                inscriptionPost.getTopic(),
+                extractDescription(inscriptionPost));
+
+        if (inscriptionPost.getDescription() == null) {
+            inscriptionPost.setDescription(InscriptionPost.Description.builder().build());
+        }
+        inscriptionPost.getDescription().setModeration(moderation);
+
+        adjustUserImagesUploaded(user, ls.size());
+        userRepository.save(user);
+
+        ObjectId postUserId = user.getId();
         inscriptionPost.setUserId(postUserId);
 
         if (geoLocationCordinates.isPresent()) {
@@ -211,12 +226,13 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addPoastDiscription(String usernameFromToken, String postId, String discription) {
 
         User user = userRepository.findByEmail(usernameFromToken);
+        InscriptionPost post = inscriptionPostRepo.findById(new ObjectId(postId))
+                .orElseThrow(() -> new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST));
 
-        if (inscriptionPostRepo.findById(new ObjectId(postId)).isEmpty()) {
-            throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
-        }
+        ContentModeration moderation = moderateCommentContent(post, discription);
 
         publicPostDescriptionRepo.save(PublicPostDescription.builder().description(discription)
+                .moderation(moderation)
                 .postId(new ObjectId(postId)).userId(user.getId())
                 .userImageUrl(user.getProfileImage()).username(user.getName()).build());
 
@@ -243,7 +259,12 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Unprocesable request Unauthorized", HttpStatus.UNAUTHORIZED);
         }
 
+        InscriptionPost post = inscriptionPostRepo.findById(postDiscription.get().getPostId())
+                .orElseThrow(() -> new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST));
+        ContentModeration moderation = moderateCommentContent(post, discription);
+
         postDiscription.get().setDescription(discription);
+        postDiscription.get().setModeration(moderation);
 
         publicPostDescriptionRepo.save(postDiscription.get());
 
@@ -382,10 +403,25 @@ public class PostServiceImp implements PostService {
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
         if (inscriptionPostDto != null) {
-            post.setDescription(PostMapper.toEntityDescription(inscriptionPostDto.getDescription()));
-            post.setScript(inscriptionPostDto.getScript());
-            post.setTopic(inscriptionPostDto.getTopic());
-            post.setType(inscriptionPostDto.getType());
+            ContentModeration moderation = moderatePostContent(
+                    resolveTitle(post, inscriptionPostDto),
+                    resolveTopic(post, inscriptionPostDto),
+                    resolveDescription(post, inscriptionPostDto));
+
+            post.setDescription(mergeDescription(post.getDescription(), inscriptionPostDto.getDescription(), moderation));
+
+            if (inscriptionPostDto.getScript() != null) {
+                post.setScript(inscriptionPostDto.getScript());
+            }
+            if (inscriptionPostDto.getTopic() != null) {
+                post.setTopic(inscriptionPostDto.getTopic());
+            }
+            if (inscriptionPostDto.getType() != null) {
+                post.setType(inscriptionPostDto.getType());
+            }
+            if (inscriptionPostDto.getVisiblity() != null) {
+                post.setVisiblity(inscriptionPostDto.getVisiblity());
+            }
         }
 
         List<String> updatedImageIds = removeDeletedImageIds(existingImageIds, deletableImageIds);
@@ -481,6 +517,93 @@ public class PostServiceImp implements PostService {
                 .count());
 
         return UserResponse.responseHandler("Dashboard Counts", HttpStatus.OK, counts);
+    }
+
+    private ContentModeration moderatePostContent(String title, String topic, String description) {
+        return moderateContent(title, topic, description);
+    }
+
+    private ContentModeration moderateCommentContent(InscriptionPost post, String description) {
+        return moderateContent(extractTitle(post), post.getTopic(), description);
+    }
+
+    private ContentModeration moderateContent(String title, String topic, String description) {
+        ContentModerationResult moderationResult = contentModerationService.moderate(title, topic, description);
+
+        if (!moderationResult.isApproved()) {
+            throw new StoneInscriptionException(contentModerationService.buildRejectionMessage(moderationResult),
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        return moderationResult.toContentModeration();
+    }
+
+    private String resolveTitle(InscriptionPost post, InscriptionPostDto inscriptionPostDto) {
+        if (inscriptionPostDto != null && inscriptionPostDto.getDescription() != null
+                && inscriptionPostDto.getDescription().getTitle() != null) {
+            return inscriptionPostDto.getDescription().getTitle();
+        }
+
+        return extractTitle(post);
+    }
+
+    private String resolveTopic(InscriptionPost post, InscriptionPostDto inscriptionPostDto) {
+        if (inscriptionPostDto != null && inscriptionPostDto.getTopic() != null) {
+            return inscriptionPostDto.getTopic();
+        }
+
+        return post.getTopic();
+    }
+
+    private String resolveDescription(InscriptionPost post, InscriptionPostDto inscriptionPostDto) {
+        if (inscriptionPostDto != null && inscriptionPostDto.getDescription() != null
+                && inscriptionPostDto.getDescription().getDescription() != null) {
+            return inscriptionPostDto.getDescription().getDescription();
+        }
+
+        return extractDescription(post);
+    }
+
+    private String extractTitle(InscriptionPost post) {
+        if (post == null || post.getDescription() == null) {
+            return null;
+        }
+
+        return post.getDescription().getTitle();
+    }
+
+    private String extractDescription(InscriptionPost post) {
+        if (post == null || post.getDescription() == null) {
+            return null;
+        }
+
+        return post.getDescription().getDescription();
+    }
+
+    private InscriptionPost.Description mergeDescription(InscriptionPost.Description existingDescription,
+            InscriptionPostDto.DescriptionDto incomingDescription, ContentModeration moderation) {
+        if (existingDescription == null) {
+            existingDescription = InscriptionPost.Description.builder().upvote(0).build();
+        }
+
+        if (incomingDescription == null) {
+            existingDescription.setModeration(moderation);
+            return existingDescription;
+        }
+
+        return InscriptionPost.Description.builder()
+                .title(incomingDescription.getTitle() != null ? incomingDescription.getTitle() : existingDescription.getTitle())
+                .subject(incomingDescription.getSubject() != null ? incomingDescription.getSubject() : existingDescription.getSubject())
+                .description(incomingDescription.getDescription() != null ? incomingDescription.getDescription() : existingDescription.getDescription())
+                .scriptLanguage(incomingDescription.getScriptLanguage() != null ? incomingDescription.getScriptLanguage() : existingDescription.getScriptLanguage())
+                .language(incomingDescription.getLanguage() != null ? incomingDescription.getLanguage() : existingDescription.getLanguage())
+                .englishTranslation(existingDescription.getEnglishTranslation())
+                .moderation(moderation)
+                .upvote(existingDescription.getUpvote() == null ? 0 : existingDescription.getUpvote())
+                .geolocation(existingDescription.getGeolocation())
+                .createdAt(existingDescription.getCreatedAt())
+                .updatedAt(existingDescription.getUpdatedAt())
+                .build();
     }
 
     private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, Set<String> replaceableImageIds,
