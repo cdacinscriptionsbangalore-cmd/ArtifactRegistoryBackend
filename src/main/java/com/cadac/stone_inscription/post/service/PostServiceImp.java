@@ -45,6 +45,8 @@ import com.cadac.stone_inscription.util.UserResponse;
 @Service
 public class PostServiceImp implements PostService {
 
+    private static final int MAX_IMAGES_PER_POST = 16;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -111,6 +113,7 @@ public class PostServiceImp implements PostService {
         }
         inscriptionPost.getDescription().setModeration(moderation);
 
+        ensureMaximumImageCount(0, 0, ls.size());
         adjustUserImagesUploaded(user, ls.size());
         userRepository.save(user);
 
@@ -400,6 +403,7 @@ public class PostServiceImp implements PostService {
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
+        ensureMaximumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
         if (inscriptionPostDto != null) {
             ContentModeration moderation = moderatePostContent(
@@ -441,6 +445,7 @@ public class PostServiceImp implements PostService {
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         List<String> updatedImageIds = getExistingImageIds(post);
+        ensureMaximumImageCount(updatedImageIds.size(), 0, newImages.size());
         updatedImageIds.addAll(saveImages(post.getId(), newImages));
 
         updatePostImages(post, updatedImageIds, Collections.emptySet());
@@ -705,6 +710,15 @@ public class PostServiceImp implements PostService {
 
         if (finalImageCount < 1) {
             throw new StoneInscriptionException("Post should have at least one image", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void ensureMaximumImageCount(int existingImageCount, int deletedImageCount, int newImageCount) {
+        int finalImageCount = existingImageCount - deletedImageCount + newImageCount;
+
+        if (finalImageCount > MAX_IMAGES_PER_POST) {
+            throw new StoneInscriptionException("Maximum " + MAX_IMAGES_PER_POST + " images are allowed per post",
+                    HttpStatus.BAD_REQUEST);
         }
     }
 

@@ -31,6 +31,9 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/post")
 public class PostController {
 
+    private static final int MAX_IMAGES_PER_POST = 16;
+    private static final long MAX_IMAGE_SIZE_BYTES = 75L * 1024 * 1024;
+
     @Autowired
     private PostService postService;
 
@@ -52,7 +55,7 @@ public class PostController {
             throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        validateFiles(files);
+        validateFiles(files, MAX_IMAGES_PER_POST);
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -208,7 +211,7 @@ public class PostController {
             @RequestPart(value = "files", required = false) MultipartFile... files) {
 
         files = getNonEmptyFiles(files);
-        validateFiles(files);
+        validateFiles(files, MAX_IMAGES_PER_POST);
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -232,7 +235,7 @@ public class PostController {
             throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        validateFiles(files);
+        validateFiles(files, MAX_IMAGES_PER_POST);
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -261,7 +264,7 @@ public class PostController {
     // TODO: Remove these methods when testing is done to restore normal behavior.
     // ============================
 
-    // @PostMapping("/test/updatePost/{email}")
+    // // @PostMapping("/test/updatePost/{email}")
     // public ResponseEntity<?> updatePostForTest(
     //         @PathVariable String email,
     //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
@@ -270,7 +273,7 @@ public class PostController {
     //         @RequestPart(value = "files", required = false) MultipartFile... files) {
 
     //     files = getNonEmptyFiles(files);
-    //     validateFiles(files);
+    //     validateFiles(files, MAX_IMAGES_PER_POST);
 
     //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
     // }
@@ -287,7 +290,7 @@ public class PostController {
     //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
     //     }
 
-    //     validateFiles(files);
+    //     validateFiles(files, MAX_IMAGES_PER_POST);
 
     //     return postService.addPostWithFile(InscriptionPostDto, files, email);
     // }
@@ -304,7 +307,7 @@ public class PostController {
     //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
     //     }
 
-    //     validateFiles(files);
+    //     validateFiles(files, MAX_IMAGES_PER_POST);
 
     //     return postService.addImagesToPost(email, postId, files);
     // }
@@ -338,13 +341,23 @@ public class PostController {
                 .toArray(MultipartFile[]::new);
     }
 
-    private void validateFiles(MultipartFile[] files) {
+    private void validateFiles(MultipartFile[] files, int maxFilesAllowed) {
+        if (files.length > maxFilesAllowed) {
+            throw new StoneInscriptionException("Maximum " + maxFilesAllowed + " images are allowed per post",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         Arrays.stream(files).forEach(file -> {
             String originalFilename = file.getOriginalFilename();
             if (originalFilename == null || Arrays.stream(fileExt)
                     .map(ext -> ext.trim().toLowerCase(Locale.ROOT))
                     .noneMatch(ext -> originalFilename.toLowerCase(Locale.ROOT).endsWith(ext))) {
                 throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+                throw new StoneInscriptionException("Each image size should be less than or equal to 75 MB",
                         HttpStatus.BAD_REQUEST);
             }
         });
