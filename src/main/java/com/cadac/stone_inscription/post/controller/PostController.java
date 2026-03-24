@@ -94,7 +94,8 @@ public class PostController {
 
     @PostMapping("/addPoastDiscription")
     @Secured("user")
-    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request, String postId, String discription) {
+    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request, @RequestParam("postId") String postId,
+            @RequestParam("discription") String discription) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -108,7 +109,7 @@ public class PostController {
 
     @PostMapping("/getPostDiscription")
     @Secured("user")
-    public ResponseEntity<?> getPostDiscription(String postId) {
+    public ResponseEntity<?> getPostDiscription(@RequestParam("postId") String postId) {
 
         return postService.getPostDiscription(
                 postId);
@@ -117,8 +118,9 @@ public class PostController {
 
     @PostMapping("/updatePostDiscription")
     @Secured("user")
-    public ResponseEntity<?> updatePostDiscription(HttpServletRequest request, String discriptionId,
-            String discription) {
+    public ResponseEntity<?> updatePostDiscription(HttpServletRequest request,
+            @RequestParam("discriptionId") String discriptionId,
+            @RequestParam("discription") String discription) {
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -131,7 +133,8 @@ public class PostController {
 
     @PostMapping("/addRating")
     @Secured("user")
-    public ResponseEntity<?> addRating(HttpServletRequest request, String postId, Double rating) {
+    public ResponseEntity<?> addRating(HttpServletRequest request, @RequestParam("postId") String postId,
+            @RequestParam("rating") Double rating) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -145,7 +148,7 @@ public class PostController {
 
     @PostMapping("/addVote")
     @Secured("user")
-    public ResponseEntity<?> addVote(HttpServletRequest request, String descriptionId) {
+    public ResponseEntity<?> addVote(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -171,7 +174,7 @@ public class PostController {
 
     @PostMapping("/postDelete")
     @Secured("user")
-    public ResponseEntity<?> postDelete(HttpServletRequest request, String postId) {
+    public ResponseEntity<?> postDelete(HttpServletRequest request, @RequestParam("postId") String postId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -184,7 +187,7 @@ public class PostController {
 
     @PostMapping("/discriptionDelete")
     @Secured("user")
-    public ResponseEntity<?> descriptionDelete(HttpServletRequest request, String descriptionId) {
+    public ResponseEntity<?> descriptionDelete(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -322,6 +325,7 @@ public class PostController {
 
     //     return postService.postDelete(email, postId);
     // }
+
 
 //  end of test api's 
     private MultipartFile[] getNonEmptyFiles(MultipartFile[] files) {
