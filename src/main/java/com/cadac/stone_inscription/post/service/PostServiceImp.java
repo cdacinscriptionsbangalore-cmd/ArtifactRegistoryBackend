@@ -72,7 +72,8 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addPostWithFile(InscriptionPostDto inscriptionPostDto, MultipartFile[] files,
             String usernameFromToken) {
 
-        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, Collections.emptySet(), true);
+        User user = userRepository.findByEmail(usernameFromToken);
+        List<ImageMetaAndInfo> ls = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         // Below Line To use for Threshold similarty
 
@@ -93,8 +94,6 @@ public class PostServiceImp implements PostService {
         // .map(el -> el.getGeocCordinates())
         // .filter(Objects::nonNull)
         // .findFirst();
-
-        User user = userRepository.findByEmail(usernameFromToken);
 
         InscriptionPost inscriptionPost = new InscriptionPost();
 
@@ -398,7 +397,7 @@ public class PostServiceImp implements PostService {
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, deletableImageIds, false);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), deletableImageIds, false);
 
         ensureMinimumImageCount(existingImageIds.size(), deletableImageIds.size(), newImages.size());
 
@@ -439,7 +438,7 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
         User user = userRepository.findByEmail(usernameFromToken);
-        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, Collections.emptySet(), true);
+        List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         List<String> updatedImageIds = getExistingImageIds(post);
         updatedImageIds.addAll(saveImages(post.getId(), newImages));
@@ -606,8 +605,8 @@ public class PostServiceImp implements PostService {
                 .build();
     }
 
-    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, Set<String> replaceableImageIds,
-            boolean filesRequired) {
+    private List<ImageMetaAndInfo> validateAndExtractImages(MultipartFile[] files, ObjectId userId,
+            Set<String> replaceableImageIds, boolean filesRequired) {
         if (files == null || files.length == 0) {
             if (filesRequired) {
                 throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
@@ -626,14 +625,18 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Duplicate Image Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        boolean imageAlreadyExists = ls.stream().anyMatch(image -> {
+        List<ObjectId> userPostIds = getUserPostIds(userId);
+
+        boolean imageAlreadyExists = !userPostIds.isEmpty() && ls.stream().anyMatch(image -> {
             Optional<ImagesData> existingImage = imagesDataRepo
-                    .findFirstByMetadata_ImageHashValue(image.getPHash().getHashValue().toString());
+                    .findFirstByMetadata_ImageHashValueAndPostIdIn(
+                            image.getPHash().getHashValue().toString(),
+                            userPostIds);
             return existingImage.isPresent() && !replaceableImageIds.contains(existingImage.get().getId());
         });
 
         if (imageAlreadyExists) {
-            throw new StoneInscriptionException("Image Already Uploaded By some User", HttpStatus.CONFLICT);
+            throw new StoneInscriptionException("Image Already Uploaded By same User", HttpStatus.CONFLICT);
         }
 
         return ls;
@@ -650,6 +653,13 @@ public class PostServiceImp implements PostService {
                         .imageHashValue(image.getPHash().getHashValue().toString())
                         .build())
                 .build()).getId()).toList();
+    }
+
+    private List<ObjectId> getUserPostIds(ObjectId userId) {
+        return inscriptionPostRepo.findByUserId(userId).stream()
+                .map(InscriptionPost::getId)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private InscriptionPost getOwnedPost(String usernameFromToken, String postId) {
