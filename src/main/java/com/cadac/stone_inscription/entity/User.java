@@ -25,12 +25,12 @@ public class User {
 
   @Id
   @JsonProperty("_id")
-      @JsonSerialize(using = ToStringSerializer.class)
-private ObjectId id;
+  @JsonSerialize(using = ToStringSerializer.class)
+  private ObjectId id;
 
   @Field("authid")
   @JsonProperty("authId")
-      @JsonSerialize(using = ToStringSerializer.class)
+  @JsonSerialize(using = ToStringSerializer.class)
   private ObjectId authId;
 
   @Field("name")
@@ -96,4 +96,21 @@ private ObjectId id;
   @Field("active")
   @JsonProperty("active")
   private Boolean active;
+
+  /**
+   * Incremented by admin when a report against this user's content is validated.
+   * When this reaches the configured threshold, the user is blacklisted.
+   */
+  @Field("reportCount")
+  @JsonProperty("reportCount")
+  @Builder.Default
+  private Integer reportCount = 0;
+
+  /**
+   * Set to true when reportCount >= blacklist threshold (configured via env).
+   */
+  @Field("blackListed")
+  @JsonProperty("blackListed")
+  @Builder.Default
+  private Boolean blackListed = false;
 }

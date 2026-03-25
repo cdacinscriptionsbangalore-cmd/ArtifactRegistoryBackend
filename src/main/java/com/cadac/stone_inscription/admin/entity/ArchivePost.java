@@ -1,38 +1,34 @@
-package com.cadac.stone_inscription.entity;
+package com.cadac.stone_inscription.admin.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.cadac.stone_inscription.moderation.model.ContentModeration;
 import com.cadac.stone_inscription.entity.enums.PostStatus;
 import com.cadac.stone_inscription.entity.model.Report;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
-
 import org.bson.types.ObjectId;
-import org.springframework.data.annotation.*;
-import org.springframework.data.mongodb.core.index.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.util.Date;
-import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * Archive of rejected posts.
+ * A post is moved here from inscriptionposts when admin rejects it.
+ * Preserves the full original post structure for audit/record purposes.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "inscriptionposts")
-@CompoundIndexes({
-        @CompoundIndex(name = "user_topic_idx", def = "{'user_id': 1, 'topic': 1}"),
-        @CompoundIndex(name = "created_at_idx", def = "{'createdAt': -1}")
-})
-
-public class InscriptionPost {
+@Document(collection = "archive_posts")
+public class ArchivePost {
 
     @Id
     @JsonProperty("_id")
@@ -41,19 +37,12 @@ public class InscriptionPost {
 
     @Field("user_id")
     @JsonProperty("user_id")
-    @NotBlank
-    @Indexed
     @JsonSerialize(using = ToStringSerializer.class)
     private ObjectId userId;
-
-    @Transient
-    @JsonProperty("username")
-    private String userName;
 
     @CreatedDate
     @Field("createdAt")
     @JsonProperty("createdAt")
-    @Indexed
     private Date createdAt;
 
     @LastModifiedDate
@@ -71,7 +60,6 @@ public class InscriptionPost {
 
     @Field("topic")
     @JsonProperty("topic")
-    @Indexed
     private String topic;
 
     @Field("script")
@@ -82,40 +70,11 @@ public class InscriptionPost {
     @JsonProperty("type")
     private String type;
 
-    @Field("visiblity")
-    @JsonProperty("visiblity")
-    @Builder.Default
-    private Boolean visiblity = true;
-
-    @Field("distance")
-    @JsonProperty("distance")
-    private Double distance;
-
-    @Field("rating")
-    @JsonProperty("rating")
-    @Builder.Default
-    private Double rating = 0.0;
-
-    @Field("userrating")
-    @JsonProperty("userrating")
-    @Builder.Default
-    private List<UsersRating> userRating = new LinkedList<>();
-
-    /**
-     * Admin-managed status of the post.
-     * Defaults to ACCEPTED. Set to UNDER_REVIEW when first report comes in.
-     * Set to REJECTED when admin rejects — post is then archived.
-     */
     @Field("status")
     @JsonProperty("status")
     @Builder.Default
-    private PostStatus status = PostStatus.ACCEPTED;
+    private PostStatus status = PostStatus.REJECTED;
 
-    /**
-     * Embedded report metadata.
-     * reporters list grows with each user report.
-     * count is incremented only when admin validates a report as genuine.
-     */
     @Field("report")
     @JsonProperty("report")
     @Builder.Default
@@ -128,6 +87,7 @@ public class InscriptionPost {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Images {
+
         @Field("thumbnailImage")
         @JsonProperty("thumbnailImage")
         private String thumbnailImage;
@@ -135,7 +95,6 @@ public class InscriptionPost {
         @Field("image")
         @JsonProperty("image")
         private List<String> image;
-
     }
 
     @Data
@@ -143,6 +102,7 @@ public class InscriptionPost {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Description {
+
         @Field("title")
         @JsonProperty("title")
         private String title;
@@ -196,90 +156,17 @@ public class InscriptionPost {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class GeoLocation {
+
         @Field("lon")
         @JsonProperty("lon")
-        @NotNull
-        @NotEmpty
         private String lon;
 
         @Field("lat")
         @JsonProperty("lat")
-        @NotNull
-        @NotEmpty
         private String lat;
 
-        private String amenity;
-        private String road;
-        private String neighbourhood;
-        private String suburb;
-
-        @JsonProperty("city_district")
-        private String cityDistrict;
-
-        private String city;
-        private String county;
-
-        @JsonProperty("state_district")
-        private String stateDistrict;
-
         private String state;
-
-        @JsonProperty("ISO3166-2-lvl4")
-        private String iso3166Lvl4;
-
-        private String postcode;
+        private String city;
         private String country;
-
-        @JsonProperty("country_code")
-        private String countryCode;
-
-        @JsonProperty("place_id")
-        private Long placeId;
-
-        private String licence;
-
-        @JsonProperty("osm_type")
-        private String osmType;
-
-        @JsonProperty("osm_id")
-        private Long osmId;
-
-        @JsonProperty("class")
-        private String clazz; // "class" is reserved in Java, so renamed to clazz
-
-        private String type;
-
-        @JsonProperty("place_rank")
-        private Integer placeRank;
-
-        private Double importance;
-
-        @JsonProperty("addresstype")
-        private String addressType;
-
-        private String name;
-
-        @JsonProperty("display_name")
-        private String displayName;
-
-        private List<String> boundingbox;
-
-        @GeoSpatialIndexed
-        private List<Double> coordinates; // [lon, lat] for geo queries
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UsersRating {
-
-        @Field("userId")
-        @JsonProperty("userId")
-        private String userId;
-
-        @Field("rating")
-        @JsonProperty("rating")
-        private double rating;
     }
 }
