@@ -1,11 +1,11 @@
-package com.cadac.stone_inscription.entity;
+package com.cadac.stone_inscription.admin.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.cadac.stone_inscription.moderation.model.ContentModeration;
 import com.cadac.stone_inscription.entity.enums.PostStatus;
 import com.cadac.stone_inscription.entity.model.Report;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
 
 import lombok.*;
 import org.bson.types.ObjectId;
@@ -16,16 +16,18 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
 
+/**
+ * Archive of rejected comments.
+ * A comment is moved here from postdescription when admin rejects it.
+ * Preserves the full original comment structure for audit/record purposes.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "postdescription")
-
-public class PublicPostDescription {
+@Document(collection = "archive_comments")
+public class ArchiveComment {
 
     @Id
     @JsonProperty("id")
@@ -63,11 +65,6 @@ public class PublicPostDescription {
     @Builder.Default
     private Integer upvote = 0;
 
-    @Field("uservote")
-    @JsonProperty("userVote")
-    @Builder.Default
-    private List<UserVote> userVote = new LinkedList<>();
-
     @CreatedDate
     @Field("createdAt")
     @JsonProperty("createdAt")
@@ -78,33 +75,13 @@ public class PublicPostDescription {
     @JsonProperty("updatedAt")
     private Date updatedAt;
 
-    /**
-     * Admin-managed status of the comment.
-     * Defaults to ACCEPTED. Changes to UNDER_REVIEW on first report.
-     */
     @Field("status")
     @JsonProperty("status")
     @Builder.Default
-    private PostStatus status = PostStatus.ACCEPTED;
+    private PostStatus status = PostStatus.REJECTED;
 
-    /**
-     * Embedded report metadata for this comment.
-     * count incremented only when admin validates the report.
-     */
     @Field("report")
     @JsonProperty("report")
     @Builder.Default
     private Report report = new Report();
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserVote {
-
-        @Field("userId")
-        @JsonProperty("userId")
-        private String userId;
-
-    }
 }
