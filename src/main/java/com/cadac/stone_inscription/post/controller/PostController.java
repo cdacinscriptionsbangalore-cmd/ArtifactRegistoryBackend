@@ -25,6 +25,7 @@ import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
 import com.cadac.stone_inscription.post.service.PostService;
 
+import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -264,71 +265,88 @@ public class PostController {
     // TODO: Remove these methods when testing is done to restore normal behavior.
     // ============================
 
-    // // @PostMapping("/test/updatePost/{email}")
-    // public ResponseEntity<?> updatePostForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestParam String postId,
-    //         @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
-    //         @RequestPart(value = "files", required = false) MultipartFile... files) {
+    // @PostMapping("/test/updatePost/{email}")
+//     public ResponseEntity<?> updatePostForTest(
+//             @PathVariable String email,
+//             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+//             @RequestParam String postId,
+//             @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
+//             @RequestPart(value = "files", required = false) MultipartFile... files) {
 
-    //     files = getNonEmptyFiles(files);
-    //     validateFiles(files, MAX_IMAGES_PER_POST);
+//         files = getNonEmptyFiles(files);
+//         validateFiles(files, MAX_IMAGES_PER_POST);
 
-    //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
-    // }
+//         return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
+//     }
 
-    // @PostMapping("/test/addPostWithFile/{email}")
-    // public ResponseEntity<?> addPostWithFileForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestPart("files") MultipartFile... files) throws IOException {
+//     @PostMapping("/test/addPostWithFile/{email}")
+//     public ResponseEntity<?> addPostWithFileForTest(
+//             @PathVariable String email,
+//             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+//             @RequestPart("files") MultipartFile... files) throws IOException {
 
-    //     files = getNonEmptyFiles(files);
+//         files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+//         if (files.length == 0) {
+//             throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+//         }
 
-    //     validateFiles(files, MAX_IMAGES_PER_POST);
+//         validateFiles(files, MAX_IMAGES_PER_POST);
 
-    //     return postService.addPostWithFile(InscriptionPostDto, files, email);
-    // }
+//         return postService.addPostWithFile(InscriptionPostDto, files, email);
+//     }
 
-    // @PostMapping("/test/addImagesToPost/{email}")
-    // public ResponseEntity<?> addImagesToPostForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId,
-    //         @RequestPart("files") MultipartFile... files) {
+//     @PostMapping("/test/addImagesToPost/{email}")
+//     public ResponseEntity<?> addImagesToPostForTest(
+//             @PathVariable String email,
+//             @RequestParam String postId,
+//             @RequestPart("files") MultipartFile... files) {
 
-    //     files = getNonEmptyFiles(files);
+//         files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+//         if (files.length == 0) {
+//             throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+//         }
 
-    //     validateFiles(files, MAX_IMAGES_PER_POST);
+//         validateFiles(files, MAX_IMAGES_PER_POST);
 
-    //     return postService.addImagesToPost(email, postId, files);
-    // }
+//         return postService.addImagesToPost(email, postId, files);
+//     }
 
-    // @PostMapping("/test/deleteImagesFromPost/{email}")
-    // public ResponseEntity<?> deleteImagesFromPostForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId,
-    //         @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
+//     @PostMapping("/test/deleteImagesFromPost/{email}")
+//     public ResponseEntity<?> deleteImagesFromPostForTest(
+//             @PathVariable String email,
+//             @RequestParam String postId,
+//             @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
 
-    //     return postService.deleteImagesFromPost(email, postId, deletedImageIds);
-    // }
+//         return postService.deleteImagesFromPost(email, postId, deletedImageIds);
+//     }
 
-    // @PostMapping("/test/postDelete/{email}")
-    // public ResponseEntity<?> postDeleteForTest(
-    //         @PathVariable String email,
-    //         @RequestParam String postId) {
+//     @PostMapping("/test/postDelete/{email}")
+//     public ResponseEntity<?> postDeleteForTest(
+//             @PathVariable String email,
+//             @RequestParam String postId) {
 
-    //     return postService.postDelete(email, postId);
-    // }
+//         return postService.postDelete(email, postId);
+//     }
 
+//     @PostMapping("/test/discriptionDelete/{email}")
+//     public ResponseEntity<?> descriptionDeleteForTest(
+//             @PathVariable String email,
+//             @RequestParam String descriptionId) {
+
+//         return postService.descriptionDelete(email, descriptionId);
+//     }
+
+
+//     @PostMapping("/test/addPoastDiscription/{email}")
+//     public ResponseEntity<?> addPoastDiscriptionForTest(
+//             @PathVariable String email,
+//             @RequestParam String postId,
+//             @RequestParam String discription) {
+
+//         return postService.addPoastDiscription(email, postId, discription);
+//   }
 
 //  end of test api's 
     private MultipartFile[] getNonEmptyFiles(MultipartFile[] files) {

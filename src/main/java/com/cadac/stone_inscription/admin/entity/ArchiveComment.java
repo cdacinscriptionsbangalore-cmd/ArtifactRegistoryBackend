@@ -34,6 +34,11 @@ public class ArchiveComment {
     @JsonSerialize(using = ToStringSerializer.class)
     private ObjectId id;
 
+    @Field("originalCommentId")
+    @JsonProperty("originalCommentId")
+    @JsonSerialize(using = ToStringSerializer.class)
+    private ObjectId originalCommentId;
+
     @Field("postId")
     @JsonProperty("postId")
     @JsonSerialize(using = ToStringSerializer.class)
