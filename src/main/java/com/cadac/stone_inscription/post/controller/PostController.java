@@ -264,7 +264,7 @@ public class PostController {
     // TODO: Remove these methods when testing is done to restore normal behavior.
     // ============================
 
-    // // @PostMapping("/test/updatePost/{email}")
+    // @PostMapping("/test/updatePost/{email}")
     // public ResponseEntity<?> updatePostForTest(
     //         @PathVariable String email,
     //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,

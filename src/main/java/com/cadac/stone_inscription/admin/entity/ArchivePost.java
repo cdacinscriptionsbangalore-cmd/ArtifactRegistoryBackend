@@ -35,6 +35,11 @@ public class ArchivePost {
     @JsonSerialize(using = ToStringSerializer.class)
     private ObjectId id;
 
+    @Field("originalPostId")
+    @JsonProperty("originalPostId")
+    @JsonSerialize(using = ToStringSerializer.class)
+    private ObjectId originalPostId;
+
     @Field("user_id")
     @JsonProperty("user_id")
     @JsonSerialize(using = ToStringSerializer.class)
