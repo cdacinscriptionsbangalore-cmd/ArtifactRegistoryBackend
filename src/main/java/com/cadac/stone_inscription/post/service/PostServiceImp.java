@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.cadac.stone_inscription.content.delete.ContentDeleteService;
 import com.cadac.stone_inscription.entity.ImagesData;
 import com.cadac.stone_inscription.entity.InscriptionPost;
 import com.cadac.stone_inscription.entity.PublicPostDescription;
@@ -64,6 +65,9 @@ public class PostServiceImp implements PostService {
 
     @Autowired
     private ContentModerationService contentModerationService;
+
+    @Autowired
+    private ContentDeleteService contentDeleteService;
 
     @Value("${app.backend.url}")
     private String backendUrl;
@@ -356,13 +360,8 @@ public class PostServiceImp implements PostService {
         if (!user.getId().toString().equals(postDelete.get().getUserId().toString())) {
             throw new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST);
         }
-        int deletedImageCount = getExistingImageIds(postDelete.get()).size();
-        getExistingImageIds(postDelete.get()).forEach(imagesDataRepo::deleteById);
-        adjustUserImagesUploaded(user, -deletedImageCount);
-        userRepository.save(user);
 
-        publicPostDescriptionRepo.deleteAllByPostId(postId);
-        inscriptionPostRepo.deleteById(new ObjectId(postId));
+        contentDeleteService.deletePost(postDelete.get().getId());
         return UserResponse.responseHandler("post deleted", HttpStatus.OK, true);
     }
 
@@ -380,7 +379,7 @@ public class PostServiceImp implements PostService {
             throw new StoneInscriptionException("Unprocesable request Unauthorized", HttpStatus.UNAUTHORIZED);
         }
 
-        publicPostDescriptionRepo.deleteById(new ObjectId(descriptionId));
+        contentDeleteService.deleteComment(postDiscription.get().getId());
 
         return UserResponse.responseHandler("description deleted", HttpStatus.OK, true);
     }
