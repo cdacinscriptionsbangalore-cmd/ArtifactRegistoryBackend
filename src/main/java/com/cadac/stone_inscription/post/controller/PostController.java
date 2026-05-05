@@ -295,6 +295,16 @@ public class PostController {
     //     return postService.addPostWithFile(InscriptionPostDto, files, email);
     // }
 
+    // @PostMapping("/test/addPoastDiscription/{email}")
+    // public ResponseEntity<?> addPoastDiscriptionForTest(
+    //     @PathVariable String email,
+    //     @RequestParam("postId") String postId,
+    //     @RequestParam("discription") String discription) {
+
+    // return postService.addPoastDiscription(email, postId, discription);
+    // }
+
+
     // @PostMapping("/test/addImagesToPost/{email}")
     // public ResponseEntity<?> addImagesToPostForTest(
     //         @PathVariable String email,
