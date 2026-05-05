@@ -1,6 +1,7 @@
 package com.cadac.stone_inscription.moderation.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
@@ -19,18 +20,23 @@ public class ContentModerationResponseDto {
     private String timestamp;
 
     @JsonProperty("decision")
+    @JsonAlias({ "verdict", "action" })
     private String decision;
 
     @JsonProperty("label")
+    @JsonAlias({ "category", "classification" })
     private String label;
 
     @JsonProperty("confidence")
+    @JsonAlias({ "score", "confidenceScore", "confidence_score", "probability" })
     private Double confidence;
 
     @JsonProperty("reason")
+    @JsonAlias({ "message", "explanation" })
     private String reason;
 
     @JsonProperty("status")
+    @JsonAlias({ "state" })
     private String status;
 
     @JsonProperty("description")
