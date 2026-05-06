@@ -41,6 +41,7 @@ import com.cadac.stone_inscription.repository.ImagesDataRepo;
 import com.cadac.stone_inscription.repository.InscriptionPostRepo;
 import com.cadac.stone_inscription.repository.PublicPostDescriptionRepo;
 import com.cadac.stone_inscription.repository.UserRepository;
+import com.cadac.stone_inscription.user.service.BlacklistGuardService;
 import com.cadac.stone_inscription.util.UserResponse;
 
 @Service
@@ -69,6 +70,9 @@ public class PostServiceImp implements PostService {
     @Autowired
     private ContentDeleteService contentDeleteService;
 
+    @Autowired
+    private BlacklistGuardService blacklistGuardService;
+
     @Value("${app.backend.url}")
     private String backendUrl;
 
@@ -79,6 +83,7 @@ public class PostServiceImp implements PostService {
             String usernameFromToken) {
 
         User user = userRepository.findByEmail(usernameFromToken);
+        blacklistGuardService.ensureCanCreateOrModifyContent(user);
         List<ImageMetaAndInfo> ls = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         // Below Line To use for Threshold similarty
@@ -232,6 +237,7 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addPoastDiscription(String usernameFromToken, String postId, String discription) {
 
         User user = userRepository.findByEmail(usernameFromToken);
+        blacklistGuardService.ensureCanCreateOrModifyContent(user);
         InscriptionPost post = inscriptionPostRepo.findById(new ObjectId(postId))
                 .orElseThrow(() -> new StoneInscriptionException("Unprocesable request", HttpStatus.BAD_REQUEST));
 
@@ -255,6 +261,7 @@ public class PostServiceImp implements PostService {
     @Override
     public ResponseEntity<?> updatePostDiscription(String usernameFromToken, String postId, String discription) {
         User user = userRepository.findByEmail(usernameFromToken);
+        blacklistGuardService.ensureCanCreateOrModifyContent(user);
         Optional<PublicPostDescription> postDiscription = publicPostDescriptionRepo.findById(new ObjectId(postId));
 
         if (postDiscription.isEmpty()) {
@@ -396,6 +403,7 @@ public class PostServiceImp implements PostService {
 
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
         User user = userRepository.findByEmail(usernameFromToken);
+        blacklistGuardService.ensureCanCreateOrModifyContent(user);
         List<String> existingImageIds = getExistingImageIds(post);
         List<String> imagesToDelete = validateDeletedImageIds(existingImageIds, deletedImageIds, false);
         Set<String> deletableImageIds = new HashSet<>(imagesToDelete);
@@ -441,6 +449,7 @@ public class PostServiceImp implements PostService {
     public ResponseEntity<?> addImagesToPost(String usernameFromToken, String postId, MultipartFile[] files) {
         InscriptionPost post = getOwnedPost(usernameFromToken, postId);
         User user = userRepository.findByEmail(usernameFromToken);
+        blacklistGuardService.ensureCanCreateOrModifyContent(user);
         List<ImageMetaAndInfo> newImages = validateAndExtractImages(files, user.getId(), Collections.emptySet(), true);
 
         List<String> updatedImageIds = getExistingImageIds(post);

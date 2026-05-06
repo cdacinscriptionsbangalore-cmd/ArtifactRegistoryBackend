@@ -26,6 +26,7 @@ import com.cadac.stone_inscription.report.specification.ReportValidationContext;
 import com.cadac.stone_inscription.report.specification.Specification;
 import com.cadac.stone_inscription.repository.UserAuthRepository;
 import com.cadac.stone_inscription.repository.UserRepository;
+import com.cadac.stone_inscription.user.service.BlacklistGuardService;
 import com.cadac.stone_inscription.util.UserResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -43,9 +44,11 @@ public class ReportService {
     private final AiModerationHandler aiModerationHandler;
     private final HumanModerationHandler humanModerationHandler;
     private final List<Specification<ReportValidationContext>> reportSpecifications;
+    private final BlacklistGuardService blacklistGuardService;
 
     public ResponseEntity<?> createReport(String reporterEmail, CreateReportRequest request) {
         User reporter = getUserByEmail(reporterEmail);
+        blacklistGuardService.ensureCanReport(reporter);
         ResolvedReportTarget target = reportTargetResolver.resolve(request.getTargetType(), request.getTargetId());
 
         validateReportRequest(reporter, target);
@@ -53,8 +56,13 @@ public class ReportService {
         ModerationReport report = reportFactory.create(reporter, target, request);
         moderationReportRepository.save(report);
         reportActionService.markTargetUnderReview(target, reporter, request.getDetails());
+        moderateReportInternal(report, target, null, null);
 
-        return UserResponse.responseHandler("Report created successfully", HttpStatus.CREATED, report);
+        String message = report.getStatus() == ReportStatus.ESCALATED
+                ? "Report created and escalated for human moderation"
+                : "Report created and moderated successfully";
+
+        return UserResponse.responseHandler(message, HttpStatus.CREATED, report);
     }
 
     public ResponseEntity<?> getReports(String requesterEmail, ReportStatus status) {
@@ -82,19 +90,7 @@ public class ReportService {
             ensureModerator(actorEmail);
         }
 
-        ModerationHandler moderationPipeline = buildModerationPipeline();
-        ModerationExecutionContext context = ModerationExecutionContext.builder()
-                .report(report)
-                .target(target)
-                .actor(actor)
-                .actorLabel(actor.getId().toHexString())
-                .requestedAction(request == null ? null : request.getAction())
-                .note(request == null ? null : request.getNote())
-                .reportActionService(reportActionService)
-                .build();
-
-        moderationPipeline.handle(context);
-        moderationReportRepository.save(report);
+        moderateReportInternal(report, target, actor, request);
 
         String message = report.getStatus() == ReportStatus.ESCALATED
                 ? "Report escalated for human moderation"
@@ -123,6 +119,26 @@ public class ReportService {
     private ModerationHandler buildModerationPipeline() {
         aiModerationHandler.setNext(humanModerationHandler);
         return aiModerationHandler;
+    }
+
+    private void moderateReportInternal(
+            ModerationReport report,
+            ResolvedReportTarget target,
+            User actor,
+            ModerateReportRequest request) {
+        ModerationHandler moderationPipeline = buildModerationPipeline();
+        ModerationExecutionContext context = ModerationExecutionContext.builder()
+                .report(report)
+                .target(target)
+                .actor(actor)
+                .actorLabel(actor == null || actor.getId() == null ? null : actor.getId().toHexString())
+                .requestedAction(request == null ? null : request.getAction())
+                .note(request == null ? null : request.getNote())
+                .reportActionService(reportActionService)
+                .build();
+
+        moderationPipeline.handle(context);
+        moderationReportRepository.save(report);
     }
 
     private User getUserByEmail(String email) {
