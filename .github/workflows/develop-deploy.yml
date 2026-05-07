@@ -42,5 +42,5 @@ jobs:
 
       - name: Push Docker Images
         run: |
-          docker push nayanmoni458/stoneinscription:dev-latest
-          docker push nayanmoni458/stoneinscription:sha-${GITHUB_SHA::7}
+          docker push nayanmoni458/stoneinscription-backend:dev-latest
+          docker push nayanmoni458/stoneinscription-backend:sha-${GITHUB_SHA::7}
