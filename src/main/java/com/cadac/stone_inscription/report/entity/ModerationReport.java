@@ -28,6 +28,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,42 +44,51 @@ import lombok.NoArgsConstructor;
         @CompoundIndex(name = "report_target_idx", def = "{'targetId': 1, 'targetType': 1}"),
         @CompoundIndex(name = "reporter_target_idx", def = "{'reporterId': 1, 'targetId': 1, 'targetType': 1}")
 })
+@Schema(name = "ModerationReport", description = "Moderation report state, target metadata, AI score, and audit history.")
 public class ModerationReport {
 
     @Id
     @JsonProperty("_id")
     @JsonSerialize(using = ToStringSerializer.class)
+    @Schema(description = "Report identifier.", example = "665f1df013ad4e18f6a11250")
     private ObjectId id;
 
     @Field("reporterId")
     @JsonProperty("reporterId")
     @Indexed
+    @Schema(description = "Reporter user id.", example = "665f1df013ad4e18f6a11240")
     private String reporterId;
 
     @Field("targetId")
     @JsonProperty("targetId")
     @Indexed
+    @Schema(description = "Reported target id.", example = "665f1df013ad4e18f6a11244")
     private String targetId;
 
     @Field("targetType")
     @JsonProperty("targetType")
+    @Schema(description = "Reported target type.", example = "POST")
     private ReportTargetType targetType;
 
     @Field("targetAuthorId")
     @JsonProperty("targetAuthorId")
+    @Schema(description = "Author id of the reported target.", example = "665f1df013ad4e18f6a11241")
     private String targetAuthorId;
 
     @Field("reason")
     @JsonProperty("reason")
+    @Schema(description = "Reporter-selected reason.", example = "MISINFORMATION")
     private ReportReason reason;
 
     @Field("details")
     @JsonProperty("details")
+    @Schema(description = "Reporter-provided details.", example = "The inscription description contains misleading attribution.")
     private String details;
 
     @Field("status")
     @JsonProperty("status")
     @Indexed
+    @Schema(description = "Current moderation workflow status.", example = "ESCALATED")
     private ReportStatus status;
 
     @Field("activeReportKey")
@@ -88,15 +99,18 @@ public class ModerationReport {
     @Field("actionTaken")
     @JsonProperty("actionTaken")
     @Builder.Default
+    @Schema(description = "Action applied during moderation.", example = "REMOVE_CONTENT")
     private ModerationAction actionTaken = ModerationAction.NONE;
 
     @Field("resolvedBy")
     @JsonProperty("resolvedBy")
+    @Schema(description = "Actor that resolved the report.", example = "moderator@example.com")
     private String resolvedBy;
 
     @Field("aiConfidenceScore")
     @JsonProperty("aiConfidenceScore")
     @Builder.Default
+    @Schema(description = "AI confidence score from 0 to 1.", example = "0.87")
     private Double aiConfidenceScore = 0.0;
 
     @CreatedDate
@@ -121,6 +135,7 @@ public class ModerationReport {
     @Field("auditEntries")
     @JsonProperty("auditEntries")
     @Builder.Default
+    @ArraySchema(schema = @Schema(implementation = ReportAuditEntry.class))
     private List<ReportAuditEntry> auditEntries = new ArrayList<>();
 
     public static String buildActiveReportKey(String reporterId, String targetId, ReportTargetType targetType) {
