@@ -11,12 +11,16 @@ import java.util.Optional;
 
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.entity.UserAuth;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.kafka.events.report.ReportSubmittedEvent;
 import com.cadac.stone_inscription.report.dto.CreateReportRequest;
 import com.cadac.stone_inscription.report.dto.ModerateReportRequest;
 import com.cadac.stone_inscription.report.entity.ModerationReport;
@@ -60,7 +64,7 @@ class ReportServiceTests {
                 new ReportFactory(),
                 new FixedTargetResolver(target),
                 reportActionService,
-                new AiModerationHandler(),
+                new StubAiModerationHandler("{\"confidence\":0.95}"),
                 new HumanModerationHandler(),
                 List.<Specification<ReportValidationContext>>of(),
                 new BlacklistGuardService());
@@ -100,7 +104,7 @@ class ReportServiceTests {
                 new ReportFactory(),
                 new FixedTargetResolver(target),
                 reportActionService,
-                new AiModerationHandler(),
+                new StubAiModerationHandler("{\"confidence\":0.20}"),
                 new HumanModerationHandler(),
                 List.<Specification<ReportValidationContext>>of(),
                 new BlacklistGuardService());
@@ -152,7 +156,7 @@ class ReportServiceTests {
                 new ReportFactory(),
                 new FixedTargetResolver(target),
                 reportActionService,
-                new AiModerationHandler(),
+                new StubAiModerationHandler("{\"confidence\":0.95}"),
                 new HumanModerationHandler(),
                 List.<Specification<ReportValidationContext>>of(),
                 new BlacklistGuardService());
@@ -189,7 +193,7 @@ class ReportServiceTests {
                 new ReportFactory(),
                 new FixedTargetResolver(baseTarget()),
                 reportActionService,
-                new AiModerationHandler(),
+                new StubAiModerationHandler("{\"confidence\":0.95}"),
                 new HumanModerationHandler(),
                 List.<Specification<ReportValidationContext>>of(),
                 new BlacklistGuardService());
@@ -201,6 +205,103 @@ class ReportServiceTests {
         assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
         assertEquals(0, reportActionService.markUnderReviewInvocations);
         assertEquals(0, reportActionService.applyActionInvocations);
+    }
+
+    @Test
+    void createOrGetReportFromEventReturnsExistingActiveReportOnDuplicateKey() {
+        User reporter = User.builder().id(new ObjectId()).email("reporter@example.com").name("Reporter").build();
+        ResolvedReportTarget target = ResolvedReportTarget.builder()
+                .id(new ObjectId().toHexString())
+                .authorId(new ObjectId().toHexString())
+                .type(ReportTargetType.POST)
+                .content("content")
+                .entity(new Object())
+                .build();
+        ReportSubmittedEvent event = new ReportSubmittedEvent(
+                "test",
+                "1.0",
+                reporter.getId().toHexString(),
+                target.getId(),
+                ReportTargetType.POST.name(),
+                ReportReason.SPAM.name(),
+                "obvious scam");
+        ModerationReport existingReport = ModerationReport.builder()
+                .id(new ObjectId())
+                .reporterId(reporter.getId().toHexString())
+                .targetId(target.getId())
+                .targetType(ReportTargetType.POST)
+                .targetAuthorId(target.getAuthorId())
+                .reason(ReportReason.SPAM)
+                .details("obvious scam")
+                .status(ReportStatus.PENDING)
+                .activeReportKey(ModerationReport.buildActiveReportKey(
+                        reporter.getId().toHexString(),
+                        target.getId(),
+                        ReportTargetType.POST))
+                .build();
+
+        TrackingReportActionService reportActionService = new TrackingReportActionService();
+        ReportService reportService = new ReportService(
+                duplicateKeyRepository(existingReport),
+                userRepository(reporter),
+                userAuthRepository(null),
+                new ReportFactory(),
+                new FixedTargetResolver(target),
+                reportActionService,
+                new StubAiModerationHandler("{\"confidence\":0.95}"),
+                new HumanModerationHandler(),
+                List.<Specification<ReportValidationContext>>of(),
+                new BlacklistGuardService());
+
+        ModerationReport result = reportService.createOrGetReportFromEvent(event);
+
+        assertEquals(existingReport.getId(), result.getId());
+        assertEquals(0, reportActionService.markUnderReviewInvocations);
+    }
+
+    @Test
+    void moderateReportReturnsConflictWhenConcurrentUpdateDetected() {
+        User moderator = User.builder().id(new ObjectId()).email("mod@example.com").build();
+        UserAuth moderatorAuth = UserAuth.builder().email(moderator.getEmail()).roles(List.of("moderator")).build();
+        ModerationReport report = ModerationReport.builder()
+                .id(new ObjectId())
+                .reporterId(new ObjectId().toHexString())
+                .targetId(new ObjectId().toHexString())
+                .targetType(ReportTargetType.POST)
+                .targetAuthorId(new ObjectId().toHexString())
+                .reason(ReportReason.OTHER)
+                .details("needs human review")
+                .status(ReportStatus.ESCALATED)
+                .actionTaken(ModerationAction.ESCALATE)
+                .version(1L)
+                .build();
+        ResolvedReportTarget target = ResolvedReportTarget.builder()
+                .id(report.getTargetId())
+                .authorId(report.getTargetAuthorId())
+                .type(ReportTargetType.POST)
+                .content("normal content")
+                .entity(new Object())
+                .build();
+        ModerateReportRequest request = new ModerateReportRequest();
+        request.setAction(ModerationAction.DISMISS);
+
+        ReportService reportService = new ReportService(
+                optimisticLockingRepository(report),
+                userRepository(moderator),
+                userAuthRepository(moderatorAuth),
+                new ReportFactory(),
+                new FixedTargetResolver(target),
+                new TrackingReportActionService(),
+                new StubAiModerationHandler("{\"confidence\":0.95}"),
+                new HumanModerationHandler(),
+                List.<Specification<ReportValidationContext>>of(),
+                new BlacklistGuardService());
+
+        StoneInscriptionException exception = assertThrows(
+                StoneInscriptionException.class,
+                () -> reportService.moderateReport(moderator.getEmail(), report.getId().toHexString(), request));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getHttpStatus());
     }
 
     private CreateReportRequest createRequest(ReportReason reason, String details) {
@@ -243,6 +344,48 @@ class ReportServiceTests {
                 });
     }
 
+    private ModerationReportRepository duplicateKeyRepository(ModerationReport existingReport) {
+        return (ModerationReportRepository) Proxy.newProxyInstance(
+                ModerationReportRepository.class.getClassLoader(),
+                new Class<?>[] { ModerationReportRepository.class },
+                (proxy, method, args) -> {
+                    if ("save".equals(method.getName())) {
+                        throw new DuplicateKeyException("duplicate active report");
+                    }
+                    if ("findFirstByActiveReportKey".equals(method.getName())) {
+                        return Optional.of(existingReport);
+                    }
+                    if ("equals".equals(method.getName())) {
+                        return proxy == args[0];
+                    }
+                    if ("hashCode".equals(method.getName())) {
+                        return System.identityHashCode(proxy);
+                    }
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
+    private ModerationReportRepository optimisticLockingRepository(ModerationReport foundReport) {
+        return (ModerationReportRepository) Proxy.newProxyInstance(
+                ModerationReportRepository.class.getClassLoader(),
+                new Class<?>[] { ModerationReportRepository.class },
+                (proxy, method, args) -> {
+                    if ("findById".equals(method.getName())) {
+                        return Optional.of(foundReport);
+                    }
+                    if ("save".equals(method.getName())) {
+                        throw new OptimisticLockingFailureException("concurrent update");
+                    }
+                    if ("equals".equals(method.getName())) {
+                        return proxy == args[0];
+                    }
+                    if ("hashCode".equals(method.getName())) {
+                        return System.identityHashCode(proxy);
+                    }
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
     private UserRepository userRepository(User user) {
         return (UserRepository) Proxy.newProxyInstance(
                 UserRepository.class.getClassLoader(),
@@ -250,6 +393,9 @@ class ReportServiceTests {
                 (proxy, method, args) -> {
                     if ("findByEmail".equals(method.getName())) {
                         return user;
+                    }
+                    if ("findById".equals(method.getName()) && user != null && user.getId() != null) {
+                        return Optional.of(user);
                     }
                     if ("equals".equals(method.getName())) {
                         return proxy == args[0];
@@ -333,6 +479,24 @@ class ReportServiceTests {
             lastAction = action;
             lastActor = actor;
             lastNote = note;
+        }
+    }
+
+    private static class StubAiModerationHandler extends AiModerationHandler {
+        private final String rawResponse;
+
+        StubAiModerationHandler(String rawResponse) {
+            this.rawResponse = rawResponse;
+        }
+
+        @Override
+        protected String invokeWebhook(Map<String, Object> requestBody, HttpHeaders headers) {
+            return rawResponse;
+        }
+
+        @Override
+        protected boolean isWebhookConfigured() {
+            return true;
         }
     }
 }

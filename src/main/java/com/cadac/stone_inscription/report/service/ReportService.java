@@ -1,8 +1,11 @@
 package com.cadac.stone_inscription.report.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.bson.types.ObjectId;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -10,9 +13,12 @@ import org.springframework.stereotype.Service;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.entity.UserAuth;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.kafka.events.report.ReportSubmittedEvent;
 import com.cadac.stone_inscription.report.dto.CreateReportRequest;
 import com.cadac.stone_inscription.report.dto.ModerateReportRequest;
 import com.cadac.stone_inscription.report.entity.ModerationReport;
+import com.cadac.stone_inscription.report.enums.ReportReason;
+import com.cadac.stone_inscription.report.enums.ReportTargetType;
 import com.cadac.stone_inscription.report.enums.ReportStatus;
 import com.cadac.stone_inscription.report.factory.ReportFactory;
 import com.cadac.stone_inscription.report.moderation.AiModerationHandler;
@@ -46,23 +52,29 @@ public class ReportService {
     private final List<Specification<ReportValidationContext>> reportSpecifications;
     private final BlacklistGuardService blacklistGuardService;
 
-    public ResponseEntity<?> createReport(String reporterEmail, CreateReportRequest request) {
-        User reporter = getUserByEmail(reporterEmail);
+    public ResponseEntity<?> submitLegacySynchronousReport(String reporterEmail, CreateReportRequest request) {
+        User reporter = getUserByEmailOrThrow(reporterEmail);
         blacklistGuardService.ensureCanReport(reporter);
         ResolvedReportTarget target = reportTargetResolver.resolve(request.getTargetType(), request.getTargetId());
 
         validateReportRequest(reporter, target);
 
         ModerationReport report = reportFactory.create(reporter, target, request);
-        moderationReportRepository.save(report);
+        saveNewReport(report);
         reportActionService.markTargetUnderReview(target, reporter, request.getDetails());
-        moderateReportInternal(report, target, null, null);
+        report = moderateReportInternal(report, target, null, null);
 
-        String message = report.getStatus() == ReportStatus.ESCALATED
-                ? "Report created and escalated for human moderation"
-                : "Report created and moderated successfully";
+        String message = switch (report.getStatus()) {
+            case ESCALATED -> "Report created and escalated for human moderation";
+            case AI_SCREENING -> "Report created and awaiting AI moderation";
+            default -> "Report created and moderated successfully";
+        };
 
         return UserResponse.responseHandler(message, HttpStatus.CREATED, report);
+    }
+
+    public ResponseEntity<?> createReport(String reporterEmail, CreateReportRequest request) {
+        return submitLegacySynchronousReport(reporterEmail, request);
     }
 
     public ResponseEntity<?> getReports(String requesterEmail, ReportStatus status) {
@@ -76,7 +88,7 @@ public class ReportService {
     }
 
     public ResponseEntity<?> moderateReport(String actorEmail, String reportId, ModerateReportRequest request) {
-        User actor = getUserByEmail(actorEmail);
+        User actor = getUserByEmailOrThrow(actorEmail);
         ModerationReport report = moderationReportRepository.findById(parseObjectId(reportId))
                 .orElseThrow(() -> new StoneInscriptionException("Report not found", HttpStatus.NOT_FOUND));
 
@@ -90,13 +102,64 @@ public class ReportService {
             ensureModerator(actorEmail);
         }
 
-        moderateReportInternal(report, target, actor, request);
+        report = moderateReportInternal(report, target, actor, request);
 
-        String message = report.getStatus() == ReportStatus.ESCALATED
-                ? "Report escalated for human moderation"
-                : "Report moderation completed";
+        String message = switch (report.getStatus()) {
+            case ESCALATED -> "Report escalated for human moderation";
+            case AI_SCREENING -> "Report remains in AI screening";
+            default -> "Report moderation completed";
+        };
 
         return UserResponse.responseHandler(message, HttpStatus.OK, report);
+    }
+
+    public ResolvedReportTarget validateSubmission(User reporter, CreateReportRequest request) {
+        blacklistGuardService.ensureCanReport(reporter);
+        ResolvedReportTarget target = reportTargetResolver.resolve(request.getTargetType(), request.getTargetId());
+        validateReportRequest(reporter, target);
+        return target;
+    }
+
+    public ModerationReport createOrGetReportFromEvent(ReportSubmittedEvent event) {
+        ReportTargetType targetType = parseTargetType(event.getTargetType());
+        String activeReportKey = ModerationReport.buildActiveReportKey(
+                event.getReporterId(),
+                event.getTargetId(),
+                targetType);
+
+        Optional<ModerationReport> existingReport = moderationReportRepository.findFirstByActiveReportKey(activeReportKey);
+
+        if (existingReport.isPresent()) {
+            return existingReport.get();
+        }
+
+        User reporter = getUserByIdOrThrow(event.getReporterId());
+        ResolvedReportTarget target = reportTargetResolver.resolve(targetType, event.getTargetId());
+        CreateReportRequest request = buildCreateReportRequest(event);
+        validateSubmission(reporter, request);
+
+        ModerationReport report = reportFactory.create(reporter, target, request);
+        return saveNewReportOrGetExisting(report, target, reporter, request.getDetails());
+    }
+
+    public String runAiModerationForSubmittedEvent(ReportSubmittedEvent event) {
+        ModerationReport report = createOrGetReportFromEvent(event);
+
+        if (report.getStatus() == ReportStatus.RESOLVED) {
+            return null;
+        }
+
+        if (report.getStatus() == ReportStatus.ESCALATED) {
+            return report.getId().toHexString();
+        }
+
+        ResolvedReportTarget target = reportTargetResolver.resolve(report.getTargetType(), report.getTargetId());
+        moderateAiOnly(report, target, "Queued AI moderation review");
+        report = saveReportOrReloadLatest(report);
+
+        return report.getStatus() == ReportStatus.ESCALATED
+                ? report.getId().toHexString()
+                : null;
     }
 
     private void validateReportRequest(User reporter, ResolvedReportTarget target) {
@@ -116,12 +179,26 @@ public class ReportService {
         }
     }
 
+    private void moderateAiOnly(ModerationReport report, ResolvedReportTarget target, String note) {
+        ModerationExecutionContext context = ModerationExecutionContext.builder()
+                .report(report)
+                .target(target)
+                .actor(null)
+                .actorLabel("AI_MODERATOR")
+                .requestedAction(null)
+                .note(note)
+                .reportActionService(reportActionService)
+                .build();
+
+        aiModerationHandler.handle(context);
+    }
+
     private ModerationHandler buildModerationPipeline() {
         aiModerationHandler.setNext(humanModerationHandler);
         return aiModerationHandler;
     }
 
-    private void moderateReportInternal(
+    private ModerationReport moderateReportInternal(
             ModerationReport report,
             ResolvedReportTarget target,
             User actor,
@@ -138,15 +215,68 @@ public class ReportService {
                 .build();
 
         moderationPipeline.handle(context);
-        moderationReportRepository.save(report);
+        return saveReportWithConflictHandling(report);
     }
 
-    private User getUserByEmail(String email) {
+    private void saveNewReport(ModerationReport report) {
+        try {
+            moderationReportRepository.save(report);
+        } catch (DuplicateKeyException ex) {
+            throw new StoneInscriptionException("You have already reported this target.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private ModerationReport saveNewReportOrGetExisting(
+            ModerationReport report,
+            ResolvedReportTarget target,
+            User reporter,
+            String details) {
+        try {
+            moderationReportRepository.save(report);
+            reportActionService.markTargetUnderReview(target, reporter, details);
+            return report;
+        } catch (DuplicateKeyException ex) {
+            return moderationReportRepository.findFirstByActiveReportKey(report.getActiveReportKey())
+                    .orElseThrow(() -> new StoneInscriptionException(
+                            "Concurrent report creation failed to reload the active report.",
+                            HttpStatus.CONFLICT));
+        }
+    }
+
+    private ModerationReport saveReportWithConflictHandling(ModerationReport report) {
+        try {
+            return moderationReportRepository.save(report);
+        } catch (OptimisticLockingFailureException ex) {
+            throw new StoneInscriptionException(
+                    "Report was updated by another moderation flow. Please reload and try again.",
+                    HttpStatus.CONFLICT);
+        }
+    }
+
+    private ModerationReport saveReportOrReloadLatest(ModerationReport report) {
+        try {
+            return moderationReportRepository.save(report);
+        } catch (OptimisticLockingFailureException ex) {
+            return getReportByIdOrThrow(report.getId().toHexString());
+        }
+    }
+
+    public User getUserByEmailOrThrow(String email) {
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new StoneInscriptionException("User not found", HttpStatus.NOT_FOUND);
         }
         return user;
+    }
+
+    private User getUserByIdOrThrow(String userId) {
+        return userRepository.findById(parseObjectId(userId))
+                .orElseThrow(() -> new StoneInscriptionException("User not found", HttpStatus.NOT_FOUND));
+    }
+
+    private ModerationReport getReportByIdOrThrow(String reportId) {
+        return moderationReportRepository.findById(parseObjectId(reportId))
+                .orElseThrow(() -> new StoneInscriptionException("Report not found", HttpStatus.NOT_FOUND));
     }
 
     private void ensureModerator(String email) {
@@ -164,6 +294,31 @@ public class ReportService {
 
         if (!hasModeratorRole) {
             throw new StoneInscriptionException("Moderator access required", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private CreateReportRequest buildCreateReportRequest(ReportSubmittedEvent event) {
+        CreateReportRequest request = new CreateReportRequest();
+        request.setTargetType(parseTargetType(event.getTargetType()));
+        request.setTargetId(event.getTargetId());
+        request.setReason(parseReason(event.getReason()));
+        request.setDetails(event.getDescription());
+        return request;
+    }
+
+    private ReportTargetType parseTargetType(String rawTargetType) {
+        try {
+            return ReportTargetType.valueOf(rawTargetType);
+        } catch (IllegalArgumentException ex) {
+            throw new StoneInscriptionException("Invalid target type", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private ReportReason parseReason(String rawReason) {
+        try {
+            return ReportReason.valueOf(rawReason);
+        } catch (IllegalArgumentException ex) {
+            throw new StoneInscriptionException("Invalid report reason", HttpStatus.BAD_REQUEST);
         }
     }
 

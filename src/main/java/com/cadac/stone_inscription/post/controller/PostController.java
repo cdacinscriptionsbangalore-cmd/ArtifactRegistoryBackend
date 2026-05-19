@@ -278,22 +278,22 @@ public class PostController {
     //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
     // }
 
-    // @PostMapping("/test/addPostWithFile/{email}")
-    // public ResponseEntity<?> addPostWithFileForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestPart("files") MultipartFile... files) throws IOException {
+    @PostMapping("/test/addPostWithFile/{email}")
+    public ResponseEntity<?> addPostWithFileForTest(
+            @PathVariable String email,
+            @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+            @RequestPart("files") MultipartFile... files) throws IOException {
 
-    //     files = getNonEmptyFiles(files);
+        files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+        if (files.length == 0) {
+            throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+        }
 
-    //     validateFiles(files, MAX_IMAGES_PER_POST);
+        validateFiles(files, MAX_IMAGES_PER_POST);
 
-    //     return postService.addPostWithFile(InscriptionPostDto, files, email);
-    // }
+        return postService.addPostWithFile(InscriptionPostDto, files, email);
+    }
 
     // @PostMapping("/test/addPoastDiscription/{email}")
     // public ResponseEntity<?> addPoastDiscriptionForTest(
