@@ -100,8 +100,8 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
 
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
-                                                .requestMatchers("/api/v1/**", "/post/**").authenticated()
-                                                //  .requestMatchers("/api/v1/**", "/post/**").permitAll()
+                                                // .requestMatchers("/api/v1/**", "/post/**").authenticated()
+                                                 .requestMatchers("/api/v1/**", "/post/**").permitAll()
                                                 .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
                                                 .anyRequest().permitAll())
 

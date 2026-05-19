@@ -94,6 +94,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         }
 
         UserAuth newUser = UserAuth.builder()
+                .username(email)
                 .email(email)
                 .provider(provider)
                 .passwordHash("oauth")
