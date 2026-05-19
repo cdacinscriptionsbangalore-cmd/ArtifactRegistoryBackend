@@ -2,6 +2,8 @@ package com.cadac.stone_inscription.post.controller;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +30,9 @@ import jakarta.servlet.http.HttpServletRequest;
 @RestController
 @RequestMapping("/post")
 public class PostController {
+
+    private static final int MAX_IMAGES_PER_POST = 16;
+    private static final long MAX_IMAGE_SIZE_BYTES = 75L * 1024 * 1024;
 
     @Autowired
     private PostService postService;
@@ -43,18 +49,13 @@ public class PostController {
             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
             HttpServletRequest request,
              @RequestPart("files") MultipartFile... files) throws IOException {
-if (files == null || files.length == 0) {
+        files = getNonEmptyFiles(files);
+
+        if (files.length == 0) {
             throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
         }
 
-        Arrays.stream(files).forEach(file -> {
-
-            if (!Arrays.stream(fileExt).anyMatch((ext) -> file.getOriginalFilename().endsWith(ext))) {
-                throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
-                        HttpStatus.BAD_REQUEST);
-            }
-
-        });
+        validateFiles(files, MAX_IMAGES_PER_POST);
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -66,7 +67,7 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/getAllPost")
-    // @Secured("user")
+    @Secured("user")
     public ResponseEntity<?> getAllPost() {
 
         return postService.getAllPost();
@@ -95,8 +96,9 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/addPoastDiscription")
-    // @Secured("user")
-    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request, String postId, String discription) {
+    @Secured("user")
+    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request, @RequestParam("postId") String postId,
+            @RequestParam("discription") String discription) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -109,8 +111,8 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/getPostDiscription")
-    // @Secured("user")
-    public ResponseEntity<?> getPostDiscription(String postId) {
+    @Secured("user")
+    public ResponseEntity<?> getPostDiscription(@RequestParam("postId") String postId) {
 
         return postService.getPostDiscription(
                 postId);
@@ -118,9 +120,10 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/updatePostDiscription")
-    // @Secured("user")
-    public ResponseEntity<?> updatePostDiscription(HttpServletRequest request, String discriptionId,
-            String discription) {
+    @Secured("user")
+    public ResponseEntity<?> updatePostDiscription(HttpServletRequest request,
+            @RequestParam("discriptionId") String discriptionId,
+            @RequestParam("discription") String discription) {
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -132,8 +135,9 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/addRating")
-    // @Secured("user")
-    public ResponseEntity<?> addRating(HttpServletRequest request, String postId, Double rating) {
+    @Secured("user")
+    public ResponseEntity<?> addRating(HttpServletRequest request, @RequestParam("postId") String postId,
+            @RequestParam("rating") Double rating) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -146,8 +150,8 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/addVote")
-    // @Secured("user")
-    public ResponseEntity<?> addVote(HttpServletRequest request, String descriptionId) {
+    @Secured("user")
+    public ResponseEntity<?> addVote(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -160,7 +164,7 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/userProfile")
-    // @Secured("user")
+    @Secured("user")
     public ResponseEntity<?> userProfile(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
@@ -172,8 +176,8 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/postDelete")
-    // @Secured("user")
-    public ResponseEntity<?> postDelete(HttpServletRequest request, String postId) {
+    @Secured("user")
+    public ResponseEntity<?> postDelete(HttpServletRequest request, @RequestParam("postId") String postId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -185,8 +189,8 @@ if (files == null || files.length == 0) {
     }
 
     @PostMapping("/discriptionDelete")
-    // @Secured("user")
-    public ResponseEntity<?> descriptionDelete(HttpServletRequest request, String descriptionId) {
+    @Secured("user")
+    public ResponseEntity<?> descriptionDelete(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -196,19 +200,177 @@ if (files == null || files.length == 0) {
         return postService.descriptionDelete(jwtUtil.getUsernameFromToken(token), descriptionId);
 
     }
-
+// Updated this function for all the updation 
+// Helps logged user to create a post and upload images 
     @PostMapping("/updatePost")
-    // @Secured("user")
+    @Secured("user")
     public ResponseEntity<?> updatePost(HttpServletRequest request,
-            @RequestPart(value = "post") InscriptionPostDto InscriptionPostDto, String postId) {
+            @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+            @RequestParam String postId,
+            @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
+            @RequestPart(value = "files", required = false) MultipartFile... files) {
+
+        files = getNonEmptyFiles(files);
+        validateFiles(files, MAX_IMAGES_PER_POST);
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
 
-        return postService.updatePost(jwtUtil.getUsernameFromToken(token), InscriptionPostDto, postId);
+        return postService.updatePost(jwtUtil.getUsernameFromToken(token), InscriptionPostDto, postId,
+                deletedImageIds, files);
 
+    }
+
+    @PostMapping("/addImagesToPost")
+    @Secured("user")
+    public ResponseEntity<?> addImagesToPost(HttpServletRequest request,
+            @RequestParam String postId,
+            @RequestPart("files") MultipartFile... files) {
+
+        files = getNonEmptyFiles(files);
+
+        if (files.length == 0) {
+            throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+        }
+
+        validateFiles(files, MAX_IMAGES_PER_POST);
+
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        return postService.addImagesToPost(jwtUtil.getUsernameFromToken(token), postId, files);
+    }
+
+    @PostMapping("/deleteImagesFromPost")
+    @Secured("user")
+    public ResponseEntity<?> deleteImagesFromPost(HttpServletRequest request,
+            @RequestParam String postId,
+            @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
+
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        return postService.deleteImagesFromPost(jwtUtil.getUsernameFromToken(token), postId, deletedImageIds);
+    }
+
+    // ============================
+    // TEST-ONLY ENDPOINTS (NO JWT)
+    // TODO: Remove these methods when testing is done to restore normal behavior.
+    // ============================
+
+    // @PostMapping("/test/updatePost/{email}")
+    // public ResponseEntity<?> updatePostForTest(
+    //         @PathVariable String email,
+    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+    //         @RequestParam String postId,
+    //         @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
+    //         @RequestPart(value = "files", required = false) MultipartFile... files) {
+
+    //     files = getNonEmptyFiles(files);
+    //     validateFiles(files, MAX_IMAGES_PER_POST);
+
+    //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
+    // }
+
+    @PostMapping("/test/addPostWithFile/{email}")
+    public ResponseEntity<?> addPostWithFileForTest(
+            @PathVariable String email,
+            @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+            @RequestPart("files") MultipartFile... files) throws IOException {
+
+        files = getNonEmptyFiles(files);
+
+        if (files.length == 0) {
+            throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+        }
+
+        validateFiles(files, MAX_IMAGES_PER_POST);
+
+        return postService.addPostWithFile(InscriptionPostDto, files, email);
+    }
+
+    // @PostMapping("/test/addPoastDiscription/{email}")
+    // public ResponseEntity<?> addPoastDiscriptionForTest(
+    //     @PathVariable String email,
+    //     @RequestParam("postId") String postId,
+    //     @RequestParam("discription") String discription) {
+
+    // return postService.addPoastDiscription(email, postId, discription);
+    // }
+
+
+    // @PostMapping("/test/addImagesToPost/{email}")
+    // public ResponseEntity<?> addImagesToPostForTest(
+    //         @PathVariable String email,
+    //         @RequestParam String postId,
+    //         @RequestPart("files") MultipartFile... files) {
+
+    //     files = getNonEmptyFiles(files);
+
+    //     if (files.length == 0) {
+    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+    //     }
+
+    //     validateFiles(files, MAX_IMAGES_PER_POST);
+
+    //     return postService.addImagesToPost(email, postId, files);
+    // }
+
+    // @PostMapping("/test/deleteImagesFromPost/{email}")
+    // public ResponseEntity<?> deleteImagesFromPostForTest(
+    //         @PathVariable String email,
+    //         @RequestParam String postId,
+    //         @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
+
+    //     return postService.deleteImagesFromPost(email, postId, deletedImageIds);
+    // }
+
+    // @PostMapping("/test/postDelete/{email}")
+    // public ResponseEntity<?> postDeleteForTest(
+    //         @PathVariable String email,
+    //         @RequestParam String postId) {
+
+    //     return postService.postDelete(email, postId);
+    // }
+
+
+//  end of test api's 
+    private MultipartFile[] getNonEmptyFiles(MultipartFile[] files) {
+        if (files == null) {
+            return new MultipartFile[0];
+        }
+
+        return Arrays.stream(files)
+                .filter(file -> file != null && !file.isEmpty())
+                .toArray(MultipartFile[]::new);
+    }
+
+    private void validateFiles(MultipartFile[] files, int maxFilesAllowed) {
+        if (files.length > maxFilesAllowed) {
+            throw new StoneInscriptionException("Maximum " + maxFilesAllowed + " images are allowed per post",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        Arrays.stream(files).forEach(file -> {
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || Arrays.stream(fileExt)
+                    .map(ext -> ext.trim().toLowerCase(Locale.ROOT))
+                    .noneMatch(ext -> originalFilename.toLowerCase(Locale.ROOT).endsWith(ext))) {
+                throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+                throw new StoneInscriptionException("Each image size should be less than or equal to 75 MB",
+                        HttpStatus.BAD_REQUEST);
+            }
+        });
     }
 
     @PostMapping("/getCommentByUser")

@@ -15,6 +15,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
@@ -79,6 +80,18 @@ public class ExceptionController {
         return new ResponseEntity<Map<String, Object>>(errorResp, HttpStatus.BAD_REQUEST);
     }
 
+
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException exception) {
+
+        Map<String, Object> errorResp = new HashMap<String, Object>();
+        errorResp.put("error_message", "Upload size exceeded the allowed limit. Each image must be 75 MB or less and a post can contain at most 16 images.");
+        errorResp.put("http_status", HttpStatus.BAD_REQUEST);
+        errorResp.put("http_status_code", HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<Map<String, Object>>(errorResp, HttpStatus.BAD_REQUEST);
+    }
 
     // // 🔹 500 Internal Server Error (catch all)
     @ExceptionHandler(Exception.class)

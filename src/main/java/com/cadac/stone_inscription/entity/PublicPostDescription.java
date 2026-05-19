@@ -3,6 +3,9 @@ package com.cadac.stone_inscription.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.cadac.stone_inscription.moderation.model.ContentModeration;
+import com.cadac.stone_inscription.entity.enums.PostStatus;
+import com.cadac.stone_inscription.entity.model.Report;
 
 import lombok.*;
 import org.bson.types.ObjectId;
@@ -51,6 +54,10 @@ public class PublicPostDescription {
     @JsonProperty("description")
     private String description;
 
+    @Field("moderation")
+    @JsonProperty("moderation")
+    private ContentModeration moderation;
+
     @Field("upvote")
     @JsonProperty("upvote")
     @Builder.Default
@@ -70,6 +77,24 @@ public class PublicPostDescription {
     @Field("updatedAt")
     @JsonProperty("updatedAt")
     private Date updatedAt;
+
+    /**
+     * Admin-managed status of the comment.
+     * Defaults to ACCEPTED. Changes to UNDER_REVIEW on first report.
+     */
+    @Field("status")
+    @JsonProperty("status")
+    @Builder.Default
+    private PostStatus status = PostStatus.ACCEPTED;
+
+    /**
+     * Embedded report metadata for this comment.
+     * count incremented only when admin validates the report.
+     */
+    @Field("report")
+    @JsonProperty("report")
+    @Builder.Default
+    private Report report = new Report();
 
     @Data
     @Builder

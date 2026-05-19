@@ -1,18 +1,58 @@
 spring:
+  datasource:
+    hikari:
+      pool-name: HikariPool-Main        # gives a readable name in Grafana
+      register-mbeans: true             # enables JMX + metric binding
   config:
     import: "optional:file:.env[.properties]"
   management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, prometheus
-  endpoint:
-    prometheus:
-      enabled: true
-  metrics:
-    export:
+    endpoints:
+      web:
+        exposure:
+          include: health, info, metrics, prometheus
+
+    endpoint:
       prometheus:
         enabled: true
+
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+
+      distribution:
+        percentiles-histogram:
+          http.server.requests: true
+  # management:
+  #   endpoints:
+  #     web:
+  #       exposure:
+  #         include: health, info, metrics, prometheus
+  #   endpoint:
+  #     prometheus:
+  #       enabled: true
+  #   metrics:
+  #     export:
+  #       prometheus:
+  #         enabled: true
+  #     distribution:
+  #       percentiles-histogram:
+  #         http.server.requests: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: stone-inscription-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.cadac.stone_inscription.kafka.events,com.cadac.stone_inscription.kafka.events.*"
+
+
+
   security:
     oauth2:
       client:
@@ -79,3 +119,21 @@ app:
     failure-url: /api/v1/fail
     login-page: /api/v1/noauth/check
     default-provider: google  # Default OAuth provider when none specified
+    
+management:
+  server:
+    port: 8081          # move actuator to separate port
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true

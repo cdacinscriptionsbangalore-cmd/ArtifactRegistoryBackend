@@ -60,6 +60,12 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
 		<!-- Lombok for Getter, Setter, and Data annotations -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -98,12 +104,11 @@
 			<artifactId>spring-security-oauth2-jose</artifactId>
 		</dependency>
 
-
 		<!--  JWT  -->
 		<dependency>
 			<groupId>com.nimbusds</groupId>
 			<artifactId>nimbus-jose-jwt</artifactId>
-			<version>9.41.2</version>
+			<version>10.0.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>
