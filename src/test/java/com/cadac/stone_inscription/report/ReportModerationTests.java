@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
@@ -35,7 +36,7 @@ class ReportModerationTests {
 
     @Test
     void aiHandlerAutoResolvesHighConfidenceReports() {
-        AiModerationHandler aiModerationHandler = new AiModerationHandler();
+        AiModerationHandler aiModerationHandler = new StubAiModerationHandler("{\"confidence\":0.95}");
         TrackingReportActionService reportActionService = new TrackingReportActionService();
 
         ModerationReport report = baseReport();
@@ -67,7 +68,7 @@ class ReportModerationTests {
 
     @Test
     void aiHandlerEscalatesLowConfidenceReports() {
-        AiModerationHandler aiModerationHandler = new AiModerationHandler();
+        AiModerationHandler aiModerationHandler = new StubAiModerationHandler("{\"confidence\":0.20}");
         TrackingReportActionService reportActionService = new TrackingReportActionService();
 
         ModerationReport report = baseReport();
@@ -95,6 +96,30 @@ class ReportModerationTests {
 
         assertEquals(ReportStatus.ESCALATED, report.getStatus());
         assertEquals(ModerationAction.ESCALATE, report.getActionTaken());
+        assertEquals(0, reportActionService.invocations);
+    }
+
+    @Test
+    void aiHandlerKeepsReportInAiScreeningWhenWebhookIsUnavailable() {
+        AiModerationHandler aiModerationHandler = new StubAiModerationHandler(null);
+        TrackingReportActionService reportActionService = new TrackingReportActionService();
+
+        ModerationReport report = baseReport();
+
+        ModerationExecutionContext context = ModerationExecutionContext.builder()
+                .report(report)
+                .target(baseTarget(new ObjectId().toHexString()))
+                .actor(User.builder().id(new ObjectId()).build())
+                .actorLabel("tester")
+                .requestedAction(null)
+                .note(null)
+                .reportActionService(reportActionService)
+                .build();
+
+        aiModerationHandler.handle(context);
+
+        assertEquals(ReportStatus.AI_SCREENING, report.getStatus());
+        assertEquals(ModerationAction.NONE, report.getActionTaken());
         assertEquals(0, reportActionService.invocations);
     }
 
@@ -174,6 +199,21 @@ class ReportModerationTests {
         assertEquals(ModerationAction.BAN_AUTHOR, reportActionService.lastAction);
     }
 
+    @Test
+    void moderationReportClearsActiveKeyWhenResolved() {
+        ModerationReport report = baseReport();
+        report.setActiveReportKey(ModerationReport.buildActiveReportKey(
+                report.getReporterId(),
+                report.getTargetId(),
+                report.getTargetType()));
+
+        report.transitionTo(ReportStatus.AI_SCREENING, "ai", ModerationAction.NONE, null);
+        report.transitionTo(ReportStatus.RESOLVED, "ai", ModerationAction.DISMISS, null);
+
+        assertEquals(ReportStatus.RESOLVED, report.getStatus());
+        assertEquals(null, report.getActiveReportKey());
+    }
+
     private ModerationReport baseReport() {
         return ModerationReport.builder()
                 .id(new ObjectId())
@@ -215,6 +255,24 @@ class ReportModerationTests {
                 String note) {
             invocations++;
             lastAction = action;
+        }
+    }
+
+    private static class StubAiModerationHandler extends AiModerationHandler {
+        private final String rawResponse;
+
+        StubAiModerationHandler(String rawResponse) {
+            this.rawResponse = rawResponse;
+        }
+
+        @Override
+        protected String invokeWebhook(java.util.Map<String, Object> requestBody, HttpHeaders headers) {
+            return rawResponse;
+        }
+
+        @Override
+        protected boolean isWebhookConfigured() {
+            return true;
         }
     }
 }

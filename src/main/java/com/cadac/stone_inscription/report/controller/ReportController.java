@@ -16,6 +16,7 @@ import com.cadac.stone_inscription.report.dto.CreateReportRequest;
 import com.cadac.stone_inscription.report.dto.ModerateReportRequest;
 import com.cadac.stone_inscription.report.enums.ReportStatus;
 import com.cadac.stone_inscription.report.service.ReportService;
+import com.cadac.stone_inscription.report.service.ReportSubmissionService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class ReportController {
 
     private final ReportService reportService;
+    private final ReportSubmissionService reportSubmissionService;
     private final JwtUtil jwtUtil;
 
     @PostMapping("/report")
@@ -34,7 +36,7 @@ public class ReportController {
             HttpServletRequest request,
             @Valid @RequestBody CreateReportRequest createReportRequest) {
 
-        return reportService.createReport(extractEmailFromToken(request), createReportRequest);
+        return reportSubmissionService.submitReport(extractEmailFromToken(request), createReportRequest);
     }
 
     @PostMapping("/test/report/{email}")
@@ -42,7 +44,7 @@ public class ReportController {
             @PathVariable String email,
             @Valid @RequestBody CreateReportRequest createReportRequest) {
 
-        return reportService.createReport(email, createReportRequest);
+        return reportSubmissionService.submitReport(email, createReportRequest);
     }
 
     @GetMapping("/reports")

@@ -2,6 +2,7 @@ package com.cadac.stone_inscription.report.repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -19,6 +20,14 @@ public interface ModerationReportRepository extends MongoRepository<ModerationRe
     List<ModerationReport> findAllByOrderByCreatedAtDesc();
 
     boolean existsByReporterIdAndTargetIdAndTargetTypeAndStatusIn(
+            String reporterId,
+            String targetId,
+            ReportTargetType targetType,
+            Collection<ReportStatus> statuses);
+
+    Optional<ModerationReport> findFirstByActiveReportKey(String activeReportKey);
+
+    Optional<ModerationReport> findFirstByReporterIdAndTargetIdAndTargetTypeAndStatusInOrderByCreatedAtDesc(
             String reporterId,
             String targetId,
             ReportTargetType targetType,

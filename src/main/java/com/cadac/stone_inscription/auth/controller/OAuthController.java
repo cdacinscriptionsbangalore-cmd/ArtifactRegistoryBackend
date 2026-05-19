@@ -2,13 +2,18 @@ package com.cadac.stone_inscription.auth.controller;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.cadac.stone_inscription.admin.service.AdminAccessService;
+import com.cadac.stone_inscription.auth.OAuthFlowCookieService;
+import com.cadac.stone_inscription.auth.OAuthFlowType;
 import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.auth.service.StoneAuthService;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
@@ -20,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.web.csrf.CsrfToken;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +36,15 @@ public class OAuthController {
 
     @Autowired
     StoneAuthService stoneAuthService;
+
+    @Autowired
+    private OAuthFlowCookieService oAuthFlowCookieService;
+
+    @Autowired
+    private AdminAccessService adminAccessService;
+
+    @Value("${app.oauth2.default-provider:google}")
+    private String defaultProvider;
 
 
       @PostMapping("/logout")
@@ -65,6 +78,57 @@ public class OAuthController {
         }
 
         return stoneAuthService.updateLastActive(refreshToken);
+    }
+
+    @GetMapping("/login/{provider}")
+    public void loginWithProvider(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.USER_LOGIN);
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @GetMapping("/login")
+    public void login(HttpServletResponse response) throws IOException {
+        loginWithProvider(defaultProvider, response);
+    }
+
+    @GetMapping("/admin/register/{provider}")
+    public void adminRegister(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_REGISTER);
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @GetMapping("/admin/register")
+    public void adminRegisterDefault(HttpServletResponse response) throws IOException {
+        adminRegister(defaultProvider, response);
+    }
+
+    @GetMapping("/admin/login/{provider}")
+    public void adminLogin(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_LOGIN);
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @GetMapping("/admin/login")
+    public void adminLoginDefault(HttpServletResponse response) throws IOException {
+        adminLogin(defaultProvider, response);
+    }
+
+    @GetMapping("/admin/approve")
+    public void approveAdminRequest(
+            @RequestParam("token") String token,
+            HttpServletResponse response) throws IOException {
+        try {
+            adminAccessService.approveRequest(token);
+            response.sendRedirect(adminAccessService.getApprovalResultRedirectUrl("approved"));
+        } catch (StoneInscriptionException ex) {
+            response.sendRedirect(adminAccessService.getApprovalResultRedirectUrl("failed"));
+        }
     }
 
 

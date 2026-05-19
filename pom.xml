@@ -60,6 +60,12 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
 		<!-- Lombok for Getter, Setter, and Data annotations -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

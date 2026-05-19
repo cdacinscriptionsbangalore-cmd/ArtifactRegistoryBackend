@@ -23,6 +23,10 @@ public class ReportFactory {
                 .reason(request.getReason())
                 .details(request.getDetails().trim())
                 .status(ReportStatus.PENDING)
+                .activeReportKey(ModerationReport.buildActiveReportKey(
+                        reporter.getId().toHexString(),
+                        target.getId(),
+                        target.getType()))
                 .actionTaken(ModerationAction.NONE)
                 .aiConfidenceScore(0.0)
                 .build();

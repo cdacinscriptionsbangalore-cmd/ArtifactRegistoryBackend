@@ -11,6 +11,7 @@ import org.bson.types.ObjectId;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -79,6 +80,11 @@ public class ModerationReport {
     @Indexed
     private ReportStatus status;
 
+    @Field("activeReportKey")
+    @JsonProperty("activeReportKey")
+    @Indexed(unique = true, sparse = true)
+    private String activeReportKey;
+
     @Field("actionTaken")
     @JsonProperty("actionTaken")
     @Builder.Default
@@ -107,10 +113,19 @@ public class ModerationReport {
     @JsonProperty("resolvedAt")
     private Date resolvedAt;
 
+    @Version
+    @Field("version")
+    @JsonProperty("version")
+    private Long version;
+
     @Field("auditEntries")
     @JsonProperty("auditEntries")
     @Builder.Default
     private List<ReportAuditEntry> auditEntries = new ArrayList<>();
+
+    public static String buildActiveReportKey(String reporterId, String targetId, ReportTargetType targetType) {
+        return reporterId + ":" + targetType + ":" + targetId;
+    }
 
     public void addAuditEntry(String actor, String message) {
         auditEntries.add(ReportAuditEntry.builder()
@@ -133,6 +148,9 @@ public class ModerationReport {
 
         if (newStatus == ReportStatus.RESOLVED) {
             this.resolvedAt = new Date();
+            this.activeReportKey = null;
+        } else if (this.activeReportKey == null && reporterId != null && targetId != null && targetType != null) {
+            this.activeReportKey = buildActiveReportKey(reporterId, targetId, targetType);
         }
 
         StringBuilder builder = new StringBuilder()

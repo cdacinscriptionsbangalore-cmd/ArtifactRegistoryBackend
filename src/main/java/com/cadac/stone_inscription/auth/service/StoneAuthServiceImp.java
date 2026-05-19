@@ -133,7 +133,10 @@ public class StoneAuthServiceImp implements StoneAuthService {
         String refreshTokenRotate = GenrateRefreshToken.doGenrateRefreshToken();
 
         User user = userRepository.findByAuthId(refreshTokenobj.getUserId());
-        String role = "user";
+        String role = refreshTokenobj.getSessionRole();
+        if (role == null || role.isBlank()) {
+            role = "user";
+        }
         String accessToken = jwtUtil.generateToken(userDetailsService.loadUserByUsername(user.getEmail()), role);
 
         // Object user = userRepo.findById(refreshTokenobj.getUserId().toString());
@@ -158,6 +161,7 @@ public class StoneAuthServiceImp implements StoneAuthService {
                 .lastUseAt(LocalDateTime.now()).revoke(false)
                 .tokenHash(GenrateRefreshToken.hashRefreshToken(refreshTokenRotate))
                 .userId(refreshTokenobj.getUserId())
+                .sessionRole(role)
                 .build();
 
         refreshTokenRepo.save(rotationObj);
