@@ -100,15 +100,16 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
 
                                 .authorizeHttpRequests(authz -> authz
                                                 .requestMatchers("/api/v1/noauth/**", "/post/public/**").permitAll()
-                                                // .requestMatchers("/api/v1/**", "/post/**").authenticated()
-                                                 .requestMatchers("/api/v1/**", "/post/**").permitAll()
+                                                .requestMatchers("/api/v1/**", "/post/**").authenticated()
+                                                //  .requestMatchers("/api/v1/**", "/post/**").permitAll()
                                                 .requestMatchers("/oauth2/**", "/oauth2/login/**").permitAll()
                                                 .anyRequest().permitAll())
 
                                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
-                                // ✅ Stateless session (required for JWT)
-                                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                // OAuth2 login needs temporary state during the redirect round-trip.
+                                // Spring will only create a session when required for that flow.
+                                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
                                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
 
