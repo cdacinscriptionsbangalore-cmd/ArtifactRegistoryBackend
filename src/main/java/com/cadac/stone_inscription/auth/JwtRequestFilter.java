@@ -3,6 +3,7 @@ package com.cadac.stone_inscription.auth;
 import java.io.IOException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
@@ -85,8 +86,8 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             // }
 
         } else {
-            
-            return null;
+            throw new StoneInscriptionException("Invalid Token Request Bearer not found ", HttpStatus.BAD_REQUEST);
+            // return null;
         }
     }
 }
