@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Base64;
 import java.util.Date;
 
@@ -16,6 +18,7 @@ import com.cadac.stone_inscription.admin.entity.AdminRequestStatus;
 import com.cadac.stone_inscription.admin.repository.AdminRequestRepository;
 import com.cadac.stone_inscription.entity.UserAuth;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.repository.UserAuthRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +28,7 @@ public class AdminAccessServiceImpl implements AdminAccessService {
 
     private final AdminRequestRepository adminRequestRepository;
     private final AdminEmailService adminEmailService;
+    private final UserAuthRepository userAuthRepository;
 
     @Value("${app.backend.url}")
     private String backendUrl;
@@ -78,6 +82,7 @@ public class AdminAccessServiceImpl implements AdminAccessService {
         request.setApprovalTokenExpiresAt(null);
 
         adminRequestRepository.save(request);
+        grantAdminRole(request.getEmail());
         adminEmailService.sendApprovalConfirmed(request.getEmail(), request.getName());
     }
 
@@ -146,6 +151,21 @@ public class AdminAccessServiceImpl implements AdminAccessService {
             return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm not available", ex);
+        }
+    }
+
+    private void grantAdminRole(String email) {
+        UserAuth userAuth = userAuthRepository.findByEmail(email);
+        if (userAuth == null) {
+            throw new StoneInscriptionException("Approved admin user not found", HttpStatus.NOT_FOUND);
+        }
+
+        List<String> roles = userAuth.getRoles() == null ? new ArrayList<>() : new ArrayList<>(userAuth.getRoles());
+        boolean hasAdminRole = roles.stream().anyMatch(role -> "admin".equalsIgnoreCase(role));
+        if (!hasAdminRole) {
+            roles.add("admin");
+            userAuth.setRoles(roles);
+            userAuthRepository.save(userAuth);
         }
     }
 }

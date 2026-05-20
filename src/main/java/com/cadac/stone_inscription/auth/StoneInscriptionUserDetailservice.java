@@ -1,7 +1,8 @@
 package com.cadac.stone_inscription.auth;
 
 import java.util.ArrayList;
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -56,7 +57,13 @@ public UserDetails loadUserByUsername(String username) throws UsernameNotFoundEx
 
     // });
 
-    return new User(user.getEmail(),user.getPasswordHash(), new ArrayList<>()); 
+    List<SimpleGrantedAuthority> authorities = user.getRoles() == null
+            ? new ArrayList<>()
+            : user.getRoles().stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toCollection(ArrayList::new));
+
+    return new User(user.getEmail(),user.getPasswordHash(), authorities); 
 
   
 

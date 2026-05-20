@@ -94,6 +94,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         }
 
         UserAuth newUser = UserAuth.builder()
+                .username(email)
                 .email(email)
                 .provider(provider)
                 .passwordHash("oauth")
@@ -104,6 +105,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         ObjectId userId = savedUserAuth.getId();
 
         User profile = User.builder()
+                .username(email)
                 .name(name)
                 .email(email)
                 .profileImage(picture)
