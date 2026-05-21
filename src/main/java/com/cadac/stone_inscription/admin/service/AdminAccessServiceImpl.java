@@ -33,7 +33,7 @@ public class AdminAccessServiceImpl implements AdminAccessService {
     @Value("${app.backend.url}")
     private String backendUrl;
 
-    @Value("${app.frontend.admin.approval-result-url:https://inscriptions.cdacb.in/admin/approval-result}")
+    @Value("${app.frontend.admin.approval-result-url}")
     private String approvalResultUrl;
 
     @Value("${admin.approval.token-validity-ms:86400000}")

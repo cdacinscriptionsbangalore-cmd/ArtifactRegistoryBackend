@@ -39,7 +39,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
     private final AdminAccessService adminAccessService;
     private final OAuthFlowCookieService oAuthFlowCookieService;
 
-    @Value("${app.frontend.oauth.callback-url:https://inscriptions.cdacb.in/oauth/callback}")
+    @Value("${app.frontend.oauth.callback-url}")
     private String frontendCallbackUrl;
 
     @Override
