@@ -65,7 +65,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
         UserAuth userAuth = findOrCreateUser(email, name, picture, provider);
         oAuthFlowCookieService.clearFlow(response);
-
+        System.out.println(flowType);
         switch (flowType) {
             case ADMIN_REGISTER -> {
                 adminAccessService.createOrRefreshPendingRequest(userAuth, name, provider);
