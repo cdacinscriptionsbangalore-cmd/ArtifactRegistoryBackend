@@ -5,7 +5,9 @@ import { setPostLoginRedirect } from "@/utils/postLoginRedirect";
 // import { jwtDecode } from "jwt-decode";
 // import { redirect } from "react-router-dom";
 
-const redirectURL = window._env_?.VITE_REDIRECT_URL || import.meta.env.VITE_REDIRECT_URL;
+const redirectURL = window._env_?.VITE_REDIRECT_URL
+  || import.meta.env.VITE_REDIRECT_URL
+  || "/api/oauth2/login";
 const adminLoginRedirectURL = window._env_?.VITE_ADMIN_LOGIN_REDIRECT_URL
   || import.meta.env.VITE_ADMIN_LOGIN_REDIRECT_URL
   || "/api/oauth2/admin/login";

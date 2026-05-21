@@ -9,7 +9,6 @@ import java.util.Map;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -22,7 +21,6 @@ import com.cadac.stone_inscription.auth.repository.RefreshTokenRepo;
 import com.cadac.stone_inscription.auth.utill.GenrateRefreshToken;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.entity.UserAuth;
-import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.repository.UserAuthRepository;
 import com.cadac.stone_inscription.repository.UserRepository;
 
@@ -65,26 +63,34 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
         UserAuth userAuth = findOrCreateUser(email, name, picture, provider);
         oAuthFlowCookieService.clearFlow(response);
-        System.out.println(flowType);
-        switch (flowType) {
-            case ADMIN_REGISTER -> {
-                adminAccessService.createOrRefreshPendingRequest(userAuth, name, provider);
-                redirect(request, response, "pending", "admin_register");
-            }
-            case ADMIN_LOGIN -> {
-                if (!adminAccessService.isApprovedAdmin(email)) {
-                    redirect(request, response, "denied", "admin_login");
-                    return;
-                }
-                issueRefreshCookie(response, userAuth.getId(), "admin");
-                redirect(request, response, "success", "admin_login");
-            }
-            case USER_LOGIN -> {
-                issueRefreshCookie(response, userAuth.getId(), "user");
-                redirect(request, response, "success", "user_login");
-            }
-            default -> throw new StoneInscriptionException("Unsupported OAuth flow", HttpStatus.BAD_REQUEST);
+        if (flowType == OAuthFlowType.ADMIN_REGISTER) {
+            adminAccessService
+                    .createOrRefreshPendingRequest(
+                            userAuth, name, provider);
+            redirect(request, response,
+                    "pending", "admin_register");
+            return;
         }
+
+        if (flowType == OAuthFlowType.ADMIN_LOGIN) {
+            if (!adminAccessService
+                    .isApprovedAdmin(email)) {
+                redirect(request, response,
+                        "denied", "admin_login");
+                return;
+            }
+            issueRefreshCookie(response,
+                    userAuth.getId(), "admin");
+            redirect(request, response,
+                    "success", "admin_login");
+            return;
+        }
+
+        issueRefreshCookie(response,
+                userAuth.getId(), "user");
+        getRedirectStrategy().sendRedirect(
+                request, response,
+                frontendCallbackUrl + "?status=success");
     }
 
     private UserAuth findOrCreateUser(String email, String name, String picture, String provider) {
