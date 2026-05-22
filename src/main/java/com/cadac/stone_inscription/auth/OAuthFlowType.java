@@ -3,7 +3,8 @@ package com.cadac.stone_inscription.auth;
 public enum OAuthFlowType {
     USER_LOGIN("user_login"),
     ADMIN_REGISTER("admin_register"),
-    ADMIN_LOGIN("admin_login");
+    ADMIN_LOGIN("admin_login"),
+    ADMIN_AUTH("admin_auth");
 
     private final String value;
 

@@ -130,6 +130,7 @@ public class OAuthController {
         loginWithProvider(defaultProvider, response);
     }
 
+    // Deprecated: use /admin/authorization/{provider} instead.
     @GetMapping("/admin/register/{provider}")
     @Operation(summary = "Start admin registration", description = "Starts OAuth flow for an admin registration request.")
     public void adminRegister(
@@ -140,12 +141,14 @@ public class OAuthController {
         response.sendRedirect("/oauth2/authorization/" + provider);
     }
 
+    // Deprecated: use /admin/authorization instead.
     @GetMapping("/admin/register")
     @Operation(summary = "Start default admin registration", description = "Starts admin registration using the configured default OAuth provider.")
     public void adminRegisterDefault(HttpServletResponse response) throws IOException {
         adminRegister(defaultProvider, response);
     }
 
+    // Deprecated: use /admin/authorization/{provider} instead.
     @GetMapping("/admin/login/{provider}")
     @Operation(summary = "Start admin OAuth login", description = "Starts OAuth login for an approved admin account.")
     public void adminLogin(
@@ -156,10 +159,26 @@ public class OAuthController {
         response.sendRedirect("/oauth2/authorization/" + provider);
     }
 
+    // Deprecated: use /admin/authorization instead.
     @GetMapping("/admin/login")
     @Operation(summary = "Start default admin OAuth login", description = "Starts admin login using the configured default OAuth provider.")
     public void adminLoginDefault(HttpServletResponse response) throws IOException {
         adminLogin(defaultProvider, response);
+    }
+
+    @GetMapping("/admin/authorization/{provider}")
+    public void adminAuth(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @GetMapping("/admin/authorization")
+    public void adminAuthDefault(
+            HttpServletResponse response) throws IOException {
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+        response.sendRedirect("/oauth2/authorization/" + defaultProvider);
     }
 
     @GetMapping("/admin/approve")
