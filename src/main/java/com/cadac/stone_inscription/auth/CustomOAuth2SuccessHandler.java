@@ -42,6 +42,9 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
     @Value("${app.frontend.oauth.callback-url}")
     private String frontendCallbackUrl;
 
+    @Value("${app.frontend.oauth.admin-callback-url}")
+    private String frontendAdminCallbackUrl;
+
     @Override
     public void onAuthenticationSuccess(
             HttpServletRequest request,
@@ -67,7 +70,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
             adminAccessService
                     .createOrRefreshPendingRequest(
                             userAuth, name, provider);
-            redirect(request, response,
+            redirectAdmin(request, response,
                     "pending", "admin_register");
             return;
         }
@@ -75,13 +78,13 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         if (flowType == OAuthFlowType.ADMIN_LOGIN) {
             if (!adminAccessService
                     .isApprovedAdmin(email)) {
-                redirect(request, response,
+                redirectAdmin(request, response,
                         "denied", "admin_login");
                 return;
             }
             issueRefreshCookie(response,
                     userAuth.getId(), "admin");
-            redirect(request, response,
+            redirectAdmin(request, response,
                     "success", "admin_login");
             return;
         }
@@ -90,14 +93,14 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
             if (adminAccessService.isApprovedAdmin(email)) {
                 issueRefreshCookie(response,
                         userAuth.getId(), "admin");
-                redirect(request, response,
+                redirectAdmin(request, response,
                         "success", "admin_login");
                 return;
             }
             adminAccessService
                     .createOrRefreshPendingRequest(
                             userAuth, name, provider);
-            redirect(request, response,
+            redirectAdmin(request, response,
                     "pending", "admin_register");
             return;
         }
@@ -174,5 +177,16 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
                 request,
                 response,
                 frontendCallbackUrl + "?status=" + status + "&flow=" + flow);
+    }
+
+    private void redirectAdmin(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String status,
+            String flow) throws IOException {
+        getRedirectStrategy().sendRedirect(
+                request,
+                response,
+                frontendAdminCallbackUrl + "?status=" + status + "&flow=" + flow);
     }
 }
