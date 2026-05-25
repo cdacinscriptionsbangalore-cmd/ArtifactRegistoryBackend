@@ -7,12 +7,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.method.HandlerMethod;
 
-import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
@@ -28,8 +27,9 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
         name = OpenApiConfiguration.BEARER_AUTH,
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
-        bearerFormat = "JWT",
-        in = SecuritySchemeIn.HEADER)
+        bearerFormat = "JWT"
+        // in = SecuritySchemeIn.HEADER
+    )
 public class OpenApiConfiguration {
 
     public static final String BEARER_AUTH = "bearerAuth";
