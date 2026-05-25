@@ -3,6 +3,7 @@ package com.cadac.stone_inscription.auth;
 import java.time.Duration;
 import java.util.Arrays;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -16,12 +17,16 @@ public class OAuthFlowCookieService {
 
     public static final String FLOW_COOKIE_NAME = "oauth_flow";
 
+    @Value("${app.cookie.domain}")
+    private String cookieDomain;
+
     public void storeFlow(HttpServletResponse response, OAuthFlowType flowType) {
         ResponseCookie cookie = ResponseCookie.from(FLOW_COOKIE_NAME, flowType.getValue())
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("None")
                 .path("/")
+                .domain(cookieDomain)
                 .maxAge(Duration.ofMinutes(10))
                 .build();
 
