@@ -66,29 +66,6 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
         UserAuth userAuth = findOrCreateUser(email, name, picture, provider);
         oAuthFlowCookieService.clearFlow(response);
-        if (flowType == OAuthFlowType.ADMIN_REGISTER) {
-            adminAccessService
-                    .createOrRefreshPendingRequest(
-                            userAuth, name, provider);
-            redirectAdmin(request, response,
-                    "pending", "admin_register");
-            return;
-        }
-
-        if (flowType == OAuthFlowType.ADMIN_LOGIN) {
-            if (!adminAccessService
-                    .isApprovedAdmin(email)) {
-                redirectAdmin(request, response,
-                        "denied", "admin_login");
-                return;
-            }
-            issueRefreshCookie(response,
-                    userAuth.getId(), "admin");
-            redirectAdmin(request, response,
-                    "success", "admin_login");
-            return;
-        }
-
         if (flowType == OAuthFlowType.ADMIN_AUTH) {
             if (adminAccessService.isApprovedAdmin(email)) {
                 issueRefreshCookie(response,
