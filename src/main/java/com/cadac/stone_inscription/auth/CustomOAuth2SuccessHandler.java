@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -32,6 +34,9 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(CustomOAuth2SuccessHandler.class);
 
     private final UserRepository userRepository;
     private final UserAuthRepository userAuthRepository;
@@ -63,10 +68,15 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         String name = (String) attributes.get("name");
         String picture = (String) attributes.get("picture");
         OAuthFlowType flowType = oAuthFlowCookieService.readFlow(request);
+        log.debug("DEBUG flowType: " + flowType);
+        log.debug("DEBUG handler: flowType=" + flowType
+                + " email=" + email);
 
         UserAuth userAuth = findOrCreateUser(email, name, picture, provider);
         oAuthFlowCookieService.clearFlow(response);
         if (flowType == OAuthFlowType.ADMIN_AUTH) {
+            log.debug("DEBUG ADMIN_AUTH: isApprovedAdmin="
+                    + adminAccessService.isApprovedAdmin(email));
             if (adminAccessService.isApprovedAdmin(email)) {
                 issueRefreshCookie(response,
                         userAuth.getId(), "admin");
