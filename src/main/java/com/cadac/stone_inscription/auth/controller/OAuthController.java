@@ -3,12 +3,18 @@ package com.cadac.stone_inscription.auth.controller;
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cadac.stone_inscription.admin.service.AdminAccessService;
@@ -17,17 +23,9 @@ import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
 import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
 import com.cadac.stone_inscription.auth.OAuthFlowCookieService;
 import com.cadac.stone_inscription.auth.OAuthFlowType;
-import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.auth.service.StoneAuthService;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.nimbusds.jose.JOSEException;
-
-import jakarta.servlet.http.HttpServletResponse;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,12 +36,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/oauth2")
 @Tag(name = "Authentication", description = "OAuth login redirects, refresh-token rotation, session activity, and logout.")
 
 public class OAuthController {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(OAuthController.class);
 
     @Autowired
     StoneAuthService stoneAuthService;
@@ -134,8 +136,10 @@ public class OAuthController {
     public void adminAuth(
             @PathVariable String provider,
             HttpServletResponse response) throws IOException {
+        log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
         oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
         response.sendRedirect("/oauth2/authorization/" + provider);
+        log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
     }
 
     @GetMapping("/admin/authorization")
