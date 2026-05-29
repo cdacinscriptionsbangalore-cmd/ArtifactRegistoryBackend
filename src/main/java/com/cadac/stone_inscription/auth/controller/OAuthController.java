@@ -60,7 +60,7 @@ public class OAuthController {
     private String defaultProvider;
 
 
-      @PostMapping("/logout")
+    @PostMapping("/logout")
     @Operation(
             summary = "Logout",
             description = "Revokes the refresh token cookie when present and expires the browser cookie.",
@@ -138,16 +138,18 @@ public class OAuthController {
             HttpServletResponse response) throws IOException {
         log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
         oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
-        response.sendRedirect("/oauth2/authorization/" + provider);
+        // response.sendRedirect("/oauth2/authorization/" + provider);
+        response.sendRedirect("https://inscriptions.cdacb.in/api/oauth2/authorization/" + provider);
         log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
     }
 
-    @GetMapping("/admin/authorization")
-    public void adminAuthDefault(
-            HttpServletResponse response) throws IOException {
-        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
-        response.sendRedirect("/oauth2/authorization/" + defaultProvider);
-    }
+    // @GetMapping("/admin/authorization")
+    // public void adminAuthDefault(
+    //         HttpServletResponse response) throws IOException {
+    //     log.info("USER_AUTH: storeFlow called provider={}");
+    //     oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+    //     response.sendRedirect("/oauth2/authorization/" + defaultProvider);
+    // }
 
     @GetMapping("/admin/approve")
     @Operation(
