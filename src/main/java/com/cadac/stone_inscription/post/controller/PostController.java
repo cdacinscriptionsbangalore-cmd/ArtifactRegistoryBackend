@@ -20,15 +20,30 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
+import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
+import com.cadac.stone_inscription.api.dto.DashboardCountsResponse;
 import com.cadac.stone_inscription.auth.JwtUtil;
+import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
+import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
+import com.cadac.stone_inscription.api.dto.DashboardCountsResponse;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
 import com.cadac.stone_inscription.post.service.PostService;
 
+import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/post")
+@Tag(name = "Posts", description = "Inscription post, image, description, rating, and dashboard APIs.")
 public class PostController {
 
     private static final int MAX_IMAGES_PER_POST = 16;
@@ -45,9 +60,17 @@ public class PostController {
 
     @PostMapping("/addPostWithFile")
     @Secured("user")
+    @Operation(
+            summary = "Create post with images",
+            description = "Creates an inscription post from multipart metadata and one or more images. The server validates extension, image count, size, metadata, geolocation, perceptual hash data, and content moderation.",
+            responses = @ApiResponse(responseCode = "200", description = "Post images uploaded",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class),
+                            examples = @ExampleObject(value = "{\"message\":\"Images Uploaded Sucessfully\",\"http-status\":\"OK\",\"data\":true}"))))
     public ResponseEntity<?> addPostWithFile(
+            @Parameter(description = "Post metadata JSON part.", required = false)
             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
             HttpServletRequest request,
+            @Parameter(description = "Image files. Maximum 16 files, 75 MB each.", required = true)
              @RequestPart("files") MultipartFile... files) throws IOException {
         files = getNonEmptyFiles(files);
 
@@ -68,6 +91,11 @@ public class PostController {
 
     @PostMapping("/getAllPost")
     @Secured("user")
+    @Operation(
+            summary = "List all visible posts",
+            description = "Returns all posts with image identifiers expanded to public image URLs.",
+            responses = @ApiResponse(responseCode = "200", description = "Posts fetched",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> getAllPost() {
 
         return postService.getAllPost();
@@ -75,6 +103,15 @@ public class PostController {
     }
 
     @GetMapping("/public/images/{id}")
+    @Operation(
+            summary = "Download post image",
+            description = "Public endpoint that streams a stored inscription image by id.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Image stream",
+                            content = @Content(mediaType = "image/*", schema = @Schema(type = "string", format = "binary"))),
+                    @ApiResponse(responseCode = "404", description = "Image not found",
+                            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            })
     public ResponseEntity<InputStreamResource> getImage(@PathVariable String id) {
 
         return postService.getImages(id);
@@ -83,6 +120,11 @@ public class PostController {
 
     @PostMapping("/getAllUserPost")
     @Secured("user")
+    @Operation(
+            summary = "List my posts",
+            description = "Returns posts created by the authenticated user with image URLs hydrated.",
+            responses = @ApiResponse(responseCode = "200", description = "User posts fetched",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> getAllUserPost(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
@@ -97,8 +139,14 @@ public class PostController {
 
     @PostMapping("/addPoastDiscription")
     @Secured("user")
-    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request, @RequestParam("postId") String postId,
-            @RequestParam("discription") String discription) {
+    @Operation(
+            summary = "Add post description",
+            description = "Adds a user-authored description/comment to a post after content moderation. Endpoint spelling preserves the existing API contract.",
+            responses = @ApiResponse(responseCode = "200", description = "Description added",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> addPoastDiscription(HttpServletRequest request,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244") @RequestParam("postId") String postId,
+            @Parameter(description = "Description text.", example = "This line appears to mention a land grant.") @RequestParam("discription") String discription) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -112,7 +160,13 @@ public class PostController {
 
     @PostMapping("/getPostDiscription")
     @Secured("user")
-    public ResponseEntity<?> getPostDiscription(@RequestParam("postId") String postId) {
+    @Operation(
+            summary = "List post descriptions",
+            description = "Returns all user descriptions/comments for a post. Endpoint spelling preserves the existing API contract.",
+            responses = @ApiResponse(responseCode = "200", description = "Descriptions fetched",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> getPostDiscription(
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244") @RequestParam("postId") String postId) {
 
         return postService.getPostDiscription(
                 postId);
@@ -121,8 +175,15 @@ public class PostController {
 
     @PostMapping("/updatePostDiscription")
     @Secured("user")
+    @Operation(
+            summary = "Update post description",
+            description = "Updates an authenticated user's own description/comment after moderation.",
+            responses = @ApiResponse(responseCode = "200", description = "Description updated",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> updatePostDiscription(HttpServletRequest request,
+            @Parameter(description = "Description id.", example = "665f1df013ad4e18f6a11247")
             @RequestParam("discriptionId") String discriptionId,
+            @Parameter(description = "Updated description text.", example = "Updated historical reading.")
             @RequestParam("discription") String discription) {
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -136,8 +197,14 @@ public class PostController {
 
     @PostMapping("/addRating")
     @Secured("user")
-    public ResponseEntity<?> addRating(HttpServletRequest request, @RequestParam("postId") String postId,
-            @RequestParam("rating") Double rating) {
+    @Operation(
+            summary = "Rate post",
+            description = "Adds or updates the authenticated user's numeric rating for a post.",
+            responses = @ApiResponse(responseCode = "200", description = "Rating added",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> addRating(HttpServletRequest request,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244") @RequestParam("postId") String postId,
+            @Parameter(description = "Rating value.", example = "4.5") @RequestParam("rating") Double rating) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -151,7 +218,13 @@ public class PostController {
 
     @PostMapping("/addVote")
     @Secured("user")
-    public ResponseEntity<?> addVote(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
+    @Operation(
+            summary = "Toggle description vote",
+            description = "Adds an upvote when the authenticated user has not voted, or removes the existing vote.",
+            responses = @ApiResponse(responseCode = "200", description = "Vote updated",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> addVote(HttpServletRequest request,
+            @Parameter(description = "Description id.", example = "665f1df013ad4e18f6a11247") @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -165,6 +238,11 @@ public class PostController {
 
     @PostMapping("/userProfile")
     @Secured("user")
+    @Operation(
+            summary = "Get current user entity profile",
+            description = "Legacy post-module profile endpoint that returns the authenticated user object in the standard envelope.",
+            responses = @ApiResponse(responseCode = "200", description = "User profile fetched",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> userProfile(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
@@ -177,7 +255,13 @@ public class PostController {
 
     @PostMapping("/postDelete")
     @Secured("user")
-    public ResponseEntity<?> postDelete(HttpServletRequest request, @RequestParam("postId") String postId) {
+    @Operation(
+            summary = "Delete my post",
+            description = "Deletes a post owned by the authenticated user and archives related content according to the content delete service.",
+            responses = @ApiResponse(responseCode = "200", description = "Post deleted",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> postDelete(HttpServletRequest request,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244") @RequestParam("postId") String postId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -190,7 +274,13 @@ public class PostController {
 
     @PostMapping("/discriptionDelete")
     @Secured("user")
-    public ResponseEntity<?> descriptionDelete(HttpServletRequest request, @RequestParam("descriptionId") String descriptionId) {
+    @Operation(
+            summary = "Delete my description",
+            description = "Deletes a description/comment owned by the authenticated user. Endpoint spelling preserves the existing API contract.",
+            responses = @ApiResponse(responseCode = "200", description = "Description deleted",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
+    public ResponseEntity<?> descriptionDelete(HttpServletRequest request,
+            @Parameter(description = "Description id.", example = "665f1df013ad4e18f6a11247") @RequestParam("descriptionId") String descriptionId) {
 
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
@@ -204,10 +294,19 @@ public class PostController {
 // Helps logged user to create a post and upload images 
     @PostMapping("/updatePost")
     @Secured("user")
+    @Operation(
+            summary = "Update post metadata and images",
+            description = "Updates post metadata, removes selected images, adds new images, and enforces that at least one image remains and no more than 16 images are attached.",
+            responses = @ApiResponse(responseCode = "200", description = "Post updated",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> updatePost(HttpServletRequest request,
+            @Parameter(description = "Updated post metadata JSON part.", required = false)
             @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244")
             @RequestParam String postId,
+            @Parameter(description = "Image ids to remove from the post.", example = "[\"665f1df013ad4e18f6a11249\"]")
             @RequestParam(value = "deletedImageIds", required = false) List<String> deletedImageIds,
+            @Parameter(description = "New image files to add.", required = false)
             @RequestPart(value = "files", required = false) MultipartFile... files) {
 
         files = getNonEmptyFiles(files);
@@ -225,8 +324,15 @@ public class PostController {
 
     @PostMapping("/addImagesToPost")
     @Secured("user")
+    @Operation(
+            summary = "Add images to post",
+            description = "Adds one or more images to an owned post while enforcing extension, size, and max image-count rules.",
+            responses = @ApiResponse(responseCode = "200", description = "Images added",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> addImagesToPost(HttpServletRequest request,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244")
             @RequestParam String postId,
+            @Parameter(description = "Image files. Maximum 16 images per post total.", required = true)
             @RequestPart("files") MultipartFile... files) {
 
         files = getNonEmptyFiles(files);
@@ -247,8 +353,15 @@ public class PostController {
 
     @PostMapping("/deleteImagesFromPost")
     @Secured("user")
+    @Operation(
+            summary = "Delete post images",
+            description = "Deletes selected images from an owned post while ensuring the post still has at least one image.",
+            responses = @ApiResponse(responseCode = "200", description = "Images deleted",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> deleteImagesFromPost(HttpServletRequest request,
+            @Parameter(description = "Post id.", example = "665f1df013ad4e18f6a11244")
             @RequestParam String postId,
+            @Parameter(description = "Image ids to delete.", example = "[\"665f1df013ad4e18f6a11249\"]")
             @RequestParam(value = "deletedImageIds") List<String> deletedImageIds) {
 
         String token = request.getHeader("Authorization");
@@ -278,22 +391,33 @@ public class PostController {
     //     return postService.updatePost(email, InscriptionPostDto, postId, deletedImageIds, files);
     // }
 
-    // @PostMapping("/test/addPostWithFile/{email}")
-    // public ResponseEntity<?> addPostWithFileForTest(
-    //         @PathVariable String email,
-    //         @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
-    //         @RequestPart("files") MultipartFile... files) throws IOException {
+    @PostMapping("/test/addPostWithFile/{email}")
+    @Hidden
+    public ResponseEntity<?> addPostWithFileForTest(
+            @PathVariable String email,
+            @RequestPart(value = "post", required = false) InscriptionPostDto InscriptionPostDto,
+            @RequestPart("files") MultipartFile... files) throws IOException {
 
-    //     files = getNonEmptyFiles(files);
+        files = getNonEmptyFiles(files);
 
-    //     if (files.length == 0) {
-    //         throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
-    //     }
+        if (files.length == 0) {
+            throw new StoneInscriptionException("No File Uploaded", HttpStatus.BAD_REQUEST);
+        }
 
-    //     validateFiles(files, MAX_IMAGES_PER_POST);
+        validateFiles(files, MAX_IMAGES_PER_POST);
 
-    //     return postService.addPostWithFile(InscriptionPostDto, files, email);
+        return postService.addPostWithFile(InscriptionPostDto, files, email);
+    }
+
+    // @PostMapping("/test/addPoastDiscription/{email}")
+    // public ResponseEntity<?> addPoastDiscriptionForTest(
+    //     @PathVariable String email,
+    //     @RequestParam("postId") String postId,
+    //     @RequestParam("discription") String discription) {
+
+    // return postService.addPoastDiscription(email, postId, discription);
     // }
+
 
     // @PostMapping("/test/addImagesToPost/{email}")
     // public ResponseEntity<?> addImagesToPostForTest(
@@ -365,6 +489,11 @@ public class PostController {
 
     @PostMapping("/getCommentByUser")
     // @Secured("user")
+    @Operation(
+            summary = "List my descriptions",
+            description = "Returns descriptions/comments authored by the authenticated user with post preview image URLs.",
+            responses = @ApiResponse(responseCode = "200", description = "User descriptions fetched",
+                    content = @Content(schema = @Schema(implementation = ApiSuccessResponse.class))))
     public ResponseEntity<?> getCommentByUser(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
@@ -378,6 +507,12 @@ public class PostController {
 
     @GetMapping("/public/getDashboardCounts")
     // @Secured("user")
+    @Operation(
+            summary = "Get public dashboard counts",
+            description = "Returns public aggregate counts used by the dashboard.",
+            responses = @ApiResponse(responseCode = "200", description = "Dashboard counts fetched",
+                    content = @Content(schema = @Schema(implementation = DashboardCountsResponse.class),
+                            examples = @ExampleObject(value = "{\"message\":\"Dashboard Counts\",\"http-status\":\"OK\",\"data\":{\"totalUsers\":128,\"totalPosts\":42,\"totalImages\":280,\"totalGeoTaggedPosts\":31,\"totalTranslations\":17}}"))))
     public ResponseEntity<?> getDashboardCounts() {
 
         return postService.getDashboardCounts();

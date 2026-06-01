@@ -21,6 +21,7 @@ public class RefreshToken {
     private LocalDateTime lastUseAt;
     private LocalDateTime createdAt;
     private Boolean revoke;
+    private String sessionRole;
     // private String deviceId;
     // private String ipAddress;
     // private String userAgent;
