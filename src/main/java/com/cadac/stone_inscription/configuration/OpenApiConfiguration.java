@@ -28,8 +28,9 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
         name = OpenApiConfiguration.BEARER_AUTH,
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
-        bearerFormat = "JWT",
-        in = SecuritySchemeIn.HEADER)
+        bearerFormat = "JWT"
+        // in = SecuritySchemeIn.HEADER
+    )
 public class OpenApiConfiguration {
 
     public static final String BEARER_AUTH = "bearerAuth";
