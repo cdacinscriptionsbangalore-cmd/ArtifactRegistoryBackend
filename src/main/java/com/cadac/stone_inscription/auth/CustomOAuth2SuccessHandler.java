@@ -7,9 +7,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -22,7 +23,6 @@ import com.cadac.stone_inscription.auth.repository.RefreshTokenRepo;
 import com.cadac.stone_inscription.auth.utill.GenrateRefreshToken;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.entity.UserAuth;
-import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.repository.UserAuthRepository;
 import com.cadac.stone_inscription.repository.UserRepository;
 
@@ -35,14 +35,20 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(CustomOAuth2SuccessHandler.class);
+
     private final UserRepository userRepository;
     private final UserAuthRepository userAuthRepository;
     private final RefreshTokenRepo refreshTokenRepo;
     private final AdminAccessService adminAccessService;
     private final OAuthFlowCookieService oAuthFlowCookieService;
 
-    @Value("${app.frontend.oauth.callback-url:https://inscriptions.cdacb.in/oauth/callback}")
+    @Value("${app.frontend.oauth.callback-url}")
     private String frontendCallbackUrl;
+
+    @Value("${app.frontend.oauth.admin-callback-url}")
+    private String frontendAdminCallbackUrl;
 
     @Override
     public void onAuthenticationSuccess(
@@ -62,29 +68,35 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         String name = (String) attributes.get("name");
         String picture = (String) attributes.get("picture");
         OAuthFlowType flowType = oAuthFlowCookieService.readFlow(request);
+        log.debug("DEBUG flowType: " + flowType);
+        log.debug("DEBUG handler: flowType=" + flowType
+                + " email=" + email);
 
         UserAuth userAuth = findOrCreateUser(email, name, picture, provider);
         oAuthFlowCookieService.clearFlow(response);
-
-        switch (flowType) {
-            case ADMIN_REGISTER -> {
-                adminAccessService.createOrRefreshPendingRequest(userAuth, name, provider);
-                redirect(request, response, "pending", "admin_register");
+        if (flowType == OAuthFlowType.ADMIN_AUTH) {
+            log.debug("DEBUG ADMIN_AUTH: isApprovedAdmin="
+                    + adminAccessService.isApprovedAdmin(email));
+            if (adminAccessService.isApprovedAdmin(email)) {
+                issueRefreshCookie(response,
+                        userAuth.getId(), "admin");
+                redirectAdmin(request, response,
+                        "success", "admin_login");
+                return;
             }
-            case ADMIN_LOGIN -> {
-                if (!adminAccessService.isApprovedAdmin(email)) {
-                    redirect(request, response, "denied", "admin_login");
-                    return;
-                }
-                issueRefreshCookie(response, userAuth.getId(), "admin");
-                redirect(request, response, "success", "admin_login");
-            }
-            case USER_LOGIN -> {
-                issueRefreshCookie(response, userAuth.getId(), "user");
-                redirect(request, response, "success", "user_login");
-            }
-            default -> throw new StoneInscriptionException("Unsupported OAuth flow", HttpStatus.BAD_REQUEST);
+            adminAccessService
+                    .createOrRefreshPendingRequest(
+                            userAuth, name, provider);
+            redirectAdmin(request, response,
+                    "pending", "admin_register");
+            return;
         }
+
+        issueRefreshCookie(response,
+                userAuth.getId(), "user");
+        getRedirectStrategy().sendRedirect(
+                request, response,
+                frontendCallbackUrl + "?status=success");
     }
 
     private UserAuth findOrCreateUser(String email, String name, String picture, String provider) {
@@ -152,5 +164,16 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
                 request,
                 response,
                 frontendCallbackUrl + "?status=" + status + "&flow=" + flow);
+    }
+
+    private void redirectAdmin(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            String status,
+            String flow) throws IOException {
+        getRedirectStrategy().sendRedirect(
+                request,
+                response,
+                frontendAdminCallbackUrl + "?status=" + status + "&flow=" + flow);
     }
 }

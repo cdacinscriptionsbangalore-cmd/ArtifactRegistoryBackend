@@ -3,12 +3,18 @@ package com.cadac.stone_inscription.auth.controller;
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cadac.stone_inscription.admin.service.AdminAccessService;
@@ -17,17 +23,9 @@ import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
 import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
 import com.cadac.stone_inscription.auth.OAuthFlowCookieService;
 import com.cadac.stone_inscription.auth.OAuthFlowType;
-import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.auth.service.StoneAuthService;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.nimbusds.jose.JOSEException;
-
-import jakarta.servlet.http.HttpServletResponse;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,12 +36,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/oauth2")
 @Tag(name = "Authentication", description = "OAuth login redirects, refresh-token rotation, session activity, and logout.")
 
 public class OAuthController {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(OAuthController.class);
 
     @Autowired
     StoneAuthService stoneAuthService;
@@ -58,7 +60,7 @@ public class OAuthController {
     private String defaultProvider;
 
 
-      @PostMapping("/logout")
+    @PostMapping("/logout")
     @Operation(
             summary = "Logout",
             description = "Revokes the refresh token cookie when present and expires the browser cookie.",
@@ -130,37 +132,34 @@ public class OAuthController {
         loginWithProvider(defaultProvider, response);
     }
 
-    @GetMapping("/admin/register/{provider}")
-    @Operation(summary = "Start admin registration", description = "Starts OAuth flow for an admin registration request.")
-    public void adminRegister(
-            @Parameter(description = "OAuth provider registration id.", example = "google")
+    @GetMapping("/admin/authorization/{provider}")
+    public void adminAuth(
             @PathVariable String provider,
             HttpServletResponse response) throws IOException {
-        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_REGISTER);
-        response.sendRedirect("/oauth2/authorization/" + provider);
+        log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+        response.sendRedirect("/oauth2/authorization/" + provider);  // just this
+        log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
     }
 
-    @GetMapping("/admin/register")
-    @Operation(summary = "Start default admin registration", description = "Starts admin registration using the configured default OAuth provider.")
-    public void adminRegisterDefault(HttpServletResponse response) throws IOException {
-        adminRegister(defaultProvider, response);
-    }
+    // @GetMapping("/admin/authorization/{provider}")
+    // public void adminAuth(
+    //         @PathVariable String provider,
+    //         HttpServletResponse response) throws IOException {
+    //     log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
+    //     oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+    //     // response.sendRedirect("/oauth2/authorization/" + provider);
+    //     response.sendRedirect("https://inscriptions.cdacb.in/api/oauth2/authorization/" + provider);
+    //     log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
+    // }
 
-    @GetMapping("/admin/login/{provider}")
-    @Operation(summary = "Start admin OAuth login", description = "Starts OAuth login for an approved admin account.")
-    public void adminLogin(
-            @Parameter(description = "OAuth provider registration id.", example = "google")
-            @PathVariable String provider,
-            HttpServletResponse response) throws IOException {
-        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_LOGIN);
-        response.sendRedirect("/oauth2/authorization/" + provider);
-    }
-
-    @GetMapping("/admin/login")
-    @Operation(summary = "Start default admin OAuth login", description = "Starts admin login using the configured default OAuth provider.")
-    public void adminLoginDefault(HttpServletResponse response) throws IOException {
-        adminLogin(defaultProvider, response);
-    }
+    // @GetMapping("/admin/authorization")
+    // public void adminAuthDefault(
+    //         HttpServletResponse response) throws IOException {
+    //     log.info("USER_AUTH: storeFlow called provider={}");
+    //     oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+    //     response.sendRedirect("/oauth2/authorization/" + defaultProvider);
+    // }
 
     @GetMapping("/admin/approve")
     @Operation(
