@@ -132,26 +132,26 @@ public class OAuthController {
         loginWithProvider(defaultProvider, response);
     }
 
-    @GetMapping("/admin/authorization/{provider}")
-    public void adminAuth(
-            @PathVariable String provider,
-            HttpServletResponse response) throws IOException {
-        log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
-        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
-        response.sendRedirect("/oauth2/authorization/" + provider);  // just this
-        log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
-    }
-
     // @GetMapping("/admin/authorization/{provider}")
     // public void adminAuth(
     //         @PathVariable String provider,
     //         HttpServletResponse response) throws IOException {
     //     log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
     //     oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
-    //     // response.sendRedirect("/oauth2/authorization/" + provider);
-    //     response.sendRedirect("https://inscriptions.cdacb.in/api/oauth2/authorization/" + provider);
+    //     response.sendRedirect("/oauth2/authorization/" + provider);  // just this
     //     log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
     // }
+
+    @GetMapping("/admin/authorization/{provider}")
+    public void adminAuth(
+            @PathVariable String provider,
+            HttpServletResponse response) throws IOException {
+        log.info("ADMIN_AUTH: storeFlow called provider={}", provider);
+        oAuthFlowCookieService.storeFlow(response, OAuthFlowType.ADMIN_AUTH);
+        // response.sendRedirect("/oauth2/authorization/" + provider);
+        response.sendRedirect("https://inscriptions.cdacb.in/api/oauth2/authorization/" + provider);
+        log.info("ADMIN_AUTH: redirected to /oauth2/authorization/{}", provider);
+    }
 
     // @GetMapping("/admin/authorization")
     // public void adminAuthDefault(
