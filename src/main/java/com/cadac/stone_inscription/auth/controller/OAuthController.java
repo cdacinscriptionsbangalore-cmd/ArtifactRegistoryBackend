@@ -56,6 +56,9 @@ public class OAuthController {
     @Autowired
     private AdminAccessService adminAccessService;
 
+    @Value("${app.cors.url}")
+    private String allowedOrigin;
+
     @Value("${app.oauth2.default-provider:google}")
     private String defaultProvider;
 
@@ -85,7 +88,12 @@ public class OAuthController {
             })
     public ResponseEntity<?> refreshToken(HttpServletResponse response, HttpServletRequest request)
             throws UsernameNotFoundException, JOSEException {
-       
+
+        String origin = request.getHeader("Origin");
+        if (origin != null && !origin.equals(allowedOrigin)) {
+            log.warn("Forbidden refresh-token request from origin={}", origin);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         return stoneAuthService.refreshToken(request, response);
     }

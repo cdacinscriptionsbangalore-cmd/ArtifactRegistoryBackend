@@ -1,8 +1,9 @@
 package com.cadac.stone_inscription.auth.service;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +24,6 @@ import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.repository.UserRepository;
 import com.cadac.stone_inscription.util.UserResponse;
 import com.nimbusds.jose.JOSEException;
-
-import java.time.Duration;
-import java.time.LocalDateTime;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,10 +67,8 @@ public class StoneAuthServiceImp implements StoneAuthService {
         ResponseCookie deleteCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
                 .secure(true) // true in prod
-                .sameSite("None") // None in prod
-                // .secure(false) // true in prod
-                // .sameSite("Lax") // None in prod
-                .path("/") // TODO: IMPORTANT (see below) .path("/authenticated/refresh-token")
+                .sameSite("Lax") // SameSite=Lax is sufficient for same-site frontend refresh requests
+                .path("/") // NOTE: refresh token cookie is accessible on same-site API requests
                 .maxAge(Duration.ZERO)
                 .build();
 
@@ -169,10 +165,8 @@ public class StoneAuthServiceImp implements StoneAuthService {
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshTokenRotate)
                 .httpOnly(true)
                 .secure(true) // true in prod
-                .sameSite("None") // None in prod
-                // .secure(false) // true in prod
-                // .sameSite("Lax") // None in prod
-                .path("/") // TODO: IMPORTANT (see below)
+                .sameSite("Lax") // SameSite=Lax is sufficient for same-site frontend refresh requests
+                .path("/") // NOTE: refresh token cookie is accessible on same-site API requests
                 .maxAge(Duration.ofDays(30))
                 .build();
 
