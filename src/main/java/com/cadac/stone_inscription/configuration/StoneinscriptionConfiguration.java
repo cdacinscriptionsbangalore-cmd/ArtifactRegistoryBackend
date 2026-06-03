@@ -18,6 +18,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -45,6 +48,9 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
 
         @Autowired
         private ExceptionHandlerFilter exceptionHandlerFilter;
+
+        @Autowired
+        private ClientRegistrationRepository clientRegistrationRepository;
 
         @Value("${app.cors.url}")
         private String corsUrl;
@@ -89,6 +95,17 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
         }
 
         @Bean
+        public OAuth2AuthorizationRequestResolver oauth2AuthorizationRequestResolver() {
+                DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
+                                clientRegistrationRepository, "/oauth2/authorization");
+                resolver.setAuthorizationRequestCustomizer(customizer -> customizer.additionalParameters(params -> {
+                        params.put("prompt", "select_account");
+                        params.put("access_type", "offline");
+                }));
+                return resolver;
+        }
+
+        @Bean
         public SecurityFilterChain filterChain(HttpSecurity http,
                         CustomOAuth2SuccessHandler successHandler) throws Exception {
 
@@ -116,7 +133,9 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
 
                                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
 
-                                .oauth2Login(oauth2 -> oauth2.successHandler(successHandler))
+                                .oauth2Login(oauth2 -> oauth2
+                                                .authorizationEndpoint(auth -> auth.authorizationRequestResolver(oauth2AuthorizationRequestResolver()))
+                                                .successHandler(successHandler))
 
                                 // Security headers
                                 .headers(headers -> headers
