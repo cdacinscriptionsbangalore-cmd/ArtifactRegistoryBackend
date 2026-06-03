@@ -71,7 +71,7 @@ public class StoneAuthServiceImp implements StoneAuthService {
         ResponseCookie deleteCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
                 .secure(true) // true in prod
-                .sameSite("Lax") // SameSite=Lax is sufficient for same-site frontend refresh requests
+                .sameSite("Strict") // SameSite=Strict is required for refresh token cookies
                 .path("/") // NOTE: refresh token cookie is accessible on same-site API requests
                 .maxAge(Duration.ZERO)
                 .build();
@@ -156,7 +156,7 @@ public class StoneAuthServiceImp implements StoneAuthService {
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshTokenRotate)
                 .httpOnly(true)
                 .secure(true) // true in prod
-                .sameSite("Lax") // SameSite=Lax is sufficient for same-site frontend refresh requests
+                .sameSite("Strict") // SameSite=Strict is required for refresh token cookies
                 .path("/") // NOTE: refresh token cookie is accessible on same-site API requests
                 .maxAge(Duration.ofDays(30))
                 .build();

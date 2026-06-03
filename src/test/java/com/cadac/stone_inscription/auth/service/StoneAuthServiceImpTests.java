@@ -103,6 +103,7 @@ class StoneAuthServiceImpTests {
         assertEquals("new-access-token", ((Map<?, ?>) responseBody.get("data")).get("accessToken"));
         assertNotNull(response.getHeader(HttpHeaders.SET_COOKIE));
         assertEquals(true, response.getHeader(HttpHeaders.SET_COOKIE).contains("refreshToken="));
+        assertEquals(true, response.getHeader(HttpHeaders.SET_COOKIE).contains("SameSite=Strict"));
         verify(refreshTokenRepo).save(existingToken);
         verify(refreshTokenRepo, times(2)).save(any(RefreshToken.class));
         assertEquals(true, existingToken.getRevoked());
@@ -138,6 +139,9 @@ class StoneAuthServiceImpTests {
         ResponseEntity<?> result = authService.logoutAuth(request, response);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertNotNull(response.getHeader(HttpHeaders.SET_COOKIE));
+        assertEquals(true, response.getHeader(HttpHeaders.SET_COOKIE).contains("refreshToken="));
+        assertEquals(true, response.getHeader(HttpHeaders.SET_COOKIE).contains("SameSite=Strict"));
         assertEquals(true, existingToken.getRevoked());
         assertNotNull(existingToken.getRevokedAt());
         verify(refreshTokenRepo).save(existingToken);
