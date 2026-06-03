@@ -3,7 +3,6 @@ package com.cadac.stone_inscription.post.controller;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,10 +23,8 @@ import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
 import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
 import com.cadac.stone_inscription.api.dto.DashboardCountsResponse;
 import com.cadac.stone_inscription.auth.JwtUtil;
-import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
-import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
-import com.cadac.stone_inscription.api.dto.DashboardCountsResponse;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.file.FileValidationService;
 import com.cadac.stone_inscription.post.dto.InscriptionPostDto;
 import com.cadac.stone_inscription.post.service.PostService;
 
@@ -54,6 +51,9 @@ public class PostController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private FileValidationService fileValidationService;
 
     @Value("${file.extn}")
     private String[] fileExt;
@@ -473,14 +473,9 @@ public class PostController {
 
         Arrays.stream(files).forEach(file -> {
             String originalFilename = file.getOriginalFilename();
-            if (originalFilename == null || Arrays.stream(fileExt)
-                    .map(ext -> ext.trim().toLowerCase(Locale.ROOT))
-                    .noneMatch(ext -> originalFilename.toLowerCase(Locale.ROOT).endsWith(ext))) {
-                throw new StoneInscriptionException("Invalid File format only allowed" + Arrays.toString(fileExt),
-                        HttpStatus.BAD_REQUEST);
-            }
+            fileValidationService.getFileExtension(originalFilename);
 
-            if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            if (file.getSize() > fileValidationService.getMaxImageSizeBytes()) {
                 throw new StoneInscriptionException("Each image size should be less than or equal to 75 MB",
                         HttpStatus.BAD_REQUEST);
             }
