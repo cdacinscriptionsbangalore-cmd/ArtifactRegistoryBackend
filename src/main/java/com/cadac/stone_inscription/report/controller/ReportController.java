@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.api.dto.ApiErrorResponse;
 import com.cadac.stone_inscription.api.dto.ApiSuccessResponse;
 import com.cadac.stone_inscription.api.dto.ReportQueuedResponse;
+import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.report.dto.CreateReportRequest;
 import com.cadac.stone_inscription.report.dto.ModerateReportRequest;
@@ -118,7 +118,7 @@ public class ReportController {
     public ResponseEntity<?> moderateReport(
             HttpServletRequest request,
             @PathVariable String id,
-            @RequestBody(required = false) ModerateReportRequest moderateReportRequest) {
+            @Valid @RequestBody(required = false) ModerateReportRequest moderateReportRequest) {
 
         return reportService.moderateReport(extractEmailFromToken(request), id, moderateReportRequest);
     }
@@ -128,7 +128,7 @@ public class ReportController {
     public ResponseEntity<?> moderateReportForTest(
             @PathVariable String id,
             @PathVariable String email,
-            @RequestBody(required = false) ModerateReportRequest moderateReportRequest) {
+            @Valid @RequestBody(required = false) ModerateReportRequest moderateReportRequest) {
 
         return reportService.moderateReport(email, id, moderateReportRequest);
     }
