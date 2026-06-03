@@ -27,6 +27,9 @@ import com.cadac.stone_inscription.util.UserResponse;
 @Service
 public class UserServiceImpl implements UserService {
 
+    private static final String USERNAME_PATTERN = "^[A-Za-z0-9_ ]+$";
+    private static final String BIO_PATTERN = "^(?=.*[A-Za-z0-9])[A-Za-z0-9 .,!?'-]+$";
+
     @Autowired
     private UserRepository userRepository;
 
@@ -67,9 +70,12 @@ public class UserServiceImpl implements UserService {
 
         // Update username if provided
         if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
-            String newUsername = request.getUsername().trim();
-            
-            // Check if username is already taken by another user
+            String newUsername = sanitiseInput(request.getUsername(), "username");
+
+            if (!newUsername.matches(USERNAME_PATTERN)) {
+                throw new StoneInscriptionException("Username may only contain letters, numbers, spaces, and underscores", HttpStatus.UNPROCESSABLE_ENTITY);
+            }
+
             User existingUserWithUsername = userRepository.findByUsername(newUsername);
             if (existingUserWithUsername != null && !existingUserWithUsername.getId().equals(user.getId())) {
                 throw new StoneInscriptionException("Username is already taken", HttpStatus.BAD_REQUEST);
@@ -80,14 +86,14 @@ public class UserServiceImpl implements UserService {
         }
 
         if (request.getBio() != null) {
-            String newBio = request.getBio().trim();
+            String newBio = sanitiseInput(request.getBio(), "bio");
 
             if (newBio.length() < 3 || newBio.length() > 150) {
                 throw new StoneInscriptionException("Bio must be between 3 and 150 characters", HttpStatus.BAD_REQUEST);
             }
 
-            if (!newBio.matches("^(?=.*[A-Za-z0-9])[A-Za-z0-9 ]+$")) {
-                throw new StoneInscriptionException("Bio can only contain letters, numbers, and spaces", HttpStatus.BAD_REQUEST);
+            if (!newBio.matches(BIO_PATTERN)) {
+                throw new StoneInscriptionException("Bio contains invalid characters", HttpStatus.UNPROCESSABLE_ENTITY);
             }
 
             user.setBio(newBio);
@@ -195,5 +201,20 @@ public class UserServiceImpl implements UserService {
                 .followers(user.getFollowers())
                 .points(user.getPoints())
                 .build();
+    }
+
+    private String sanitiseInput(String input, String fieldName) {
+        if (input == null) {
+            return null;
+        }
+
+        String trimmed = input.trim();
+        String strippedHtml = trimmed.replaceAll("<[^>]*>", "");
+
+        if (!strippedHtml.equals(trimmed)) {
+            throw new StoneInscriptionException(fieldName + " contains disallowed HTML content", HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+
+        return trimmed;
     }
 }
