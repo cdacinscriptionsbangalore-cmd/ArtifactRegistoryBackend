@@ -93,6 +93,9 @@ public class StoneinscriptionConfiguration implements WebMvcConfigurer {
                         CustomOAuth2SuccessHandler successHandler) throws Exception {
 
                 http
+                            // Force HTTPS-only channel — redirect HTTP to HTTPS
+                                .redirectToHttps(Customizer.withDefaults())
+
                             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                                 // ✅ Disable CSRF completely for JWT stateless API

@@ -5,6 +5,14 @@ spring:
       register-mbeans: true             # enables JMX + metric binding
   config:
     import: "optional:file:.env[.properties]"
+  servlet:
+    session:
+      cookie:
+        secure: true        # Only transmit over HTTPS (prevents session hijacking via HTTP)
+        http-only: true     # Prevent JavaScript access (defence in depth)
+        same-site: strict   # Mitigate CSRF attacks — prevent cross-site cookie transmission
+        max-age: 3600       # 1 hour session lifetime
+        name: SESSION       # Rename from JSESSIONID to reduce technology fingerprinting
   management:
     endpoints:
       web:
