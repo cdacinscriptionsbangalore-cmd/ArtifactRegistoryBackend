@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -135,10 +136,11 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         RefreshToken refreshTokenEntity = RefreshToken.builder()
                 .tokenHash(GenrateRefreshToken.hashRefreshToken(refreshToken))
                 .userId(userId)
+                .familyId(UUID.randomUUID().toString())
                 .createdAt(LocalDateTime.now())
                 .lastUseAt(LocalDateTime.now())
                 .expiresAt(LocalDateTime.now().plusDays(30))
-                .revoke(false)
+                .revoked(false)
                 .sessionRole(sessionRole)
                 .build();
 
