@@ -4,7 +4,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.cadac.stone_inscription.auth.JwtUtil;
 import com.cadac.stone_inscription.auth.StoneInscriptionUserDetailservice;
@@ -57,8 +60,9 @@ public class StoneAuthServiceImp implements StoneAuthService {
                     .ifPresent(token -> {
                         String hash = GenrateRefreshToken.hashRefreshToken(token);
                         RefreshToken rt = refreshTokenRepo.findByTokenHash(hash);
-                        if (rt != null && !rt.getRevoke()) {
-                            rt.setRevoke(true);
+                        if (rt != null && !rt.getRevoked()) {
+                            rt.setRevoked(true);
+                            rt.setRevokedAt(LocalDateTime.now());
                             refreshTokenRepo.save(rt);
                         }
                     });
@@ -81,6 +85,7 @@ public class StoneAuthServiceImp implements StoneAuthService {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<?> refreshToken(HttpServletRequest request, HttpServletResponse response)
             throws UsernameNotFoundException, JOSEException {
 
@@ -101,32 +106,32 @@ public class StoneAuthServiceImp implements StoneAuthService {
         if (refreshTokenobj == null) {
             throw new StoneInscriptionException("Unauthorized", HttpStatus.UNAUTHORIZED);
         }
-        // access used token
-        if (refreshTokenobj.getRevoke()) {
-            throw new StoneInscriptionException("Unauthorize ", HttpStatus.UNAUTHORIZED);
-        }
 
-        // Token Expired
+        if (Boolean.TRUE.equals(refreshTokenobj.getRevoked())) {
+            if (refreshTokenobj.getFamilyId() != null) {
+                revokeAllTokensInFamily(refreshTokenobj.getFamilyId());
+            } else {
+                revokeAllTokensForUser(refreshTokenobj.getUserId());
+            }
+            throw new StoneInscriptionException("Unauthorized", HttpStatus.UNAUTHORIZED);
+        }
 
         if (refreshTokenobj.getExpiresAt().isBefore(LocalDateTime.now())) {
-            refreshTokenobj.setRevoke(true);
+            refreshTokenobj.setRevoked(true);
+            refreshTokenobj.setRevokedAt(LocalDateTime.now());
             refreshTokenRepo.save(refreshTokenobj);
-
-            throw new StoneInscriptionException("Unauthorize ", HttpStatus.UNAUTHORIZED);
+            throw new StoneInscriptionException("Unauthorized", HttpStatus.UNAUTHORIZED);
         }
-        // Exceed Ideal Limits commented because no use of ideal logout
-        // if
-        // (refreshTokenobj.getLastUseAt().plusMinutes(15).isBefore(LocalDateTime.now()))
-        // {
-        // refreshTokenobj.setRevoke(true);
-        // refreshTokenRepo.save(refreshTokenobj);
-        // throw new StoneInscriptionException("Unauthorize ", HttpStatus.UNAUTHORIZED);
-        // }
-        refreshTokenobj.setRevoke(true);
 
+        refreshTokenobj.setRevoked(true);
+        refreshTokenobj.setRevokedAt(LocalDateTime.now());
         refreshTokenRepo.save(refreshTokenobj);
 
         String refreshTokenRotate = GenrateRefreshToken.doGenrateRefreshToken();
+        String familyId = refreshTokenobj.getFamilyId();
+        if (familyId == null || familyId.isBlank()) {
+            familyId = UUID.randomUUID().toString();
+        }
 
         User user = userRepository.findByAuthId(refreshTokenobj.getUserId());
         String role = refreshTokenobj.getSessionRole();
@@ -135,28 +140,14 @@ public class StoneAuthServiceImp implements StoneAuthService {
         }
         String accessToken = jwtUtil.generateToken(userDetailsService.loadUserByUsername(user.getEmail()), role);
 
-        // Object user = userRepo.findById(refreshTokenobj.getUserId().toString());
-
-        // if (user == null) {
-
-        // user = newsclrepo.findById(refreshTokenobj.getUserId().toString());
-        // }
-
-        // List<String> roles = (user instanceof User) ? ((User) user).getRoles()
-        // : ((SchoolRegistration) user).getRoles();
-
-        // String accessToken = (user instanceof User)
-        // ? jwtUtil.generateToken(userDetailsService.loadUserByUsername(((User)
-        // user).getUsername()), roles)
-        // :
-        // jwtUtil.generateToken(userDetailsService.loadUserByUsername(((SchoolRegistration)
-        // user).getUsername()), roles);
-
-        RefreshToken rotationObj = RefreshToken.builder().createdAt(LocalDateTime.now())
+        RefreshToken rotationObj = RefreshToken.builder()
+                .createdAt(LocalDateTime.now())
                 .expiresAt(LocalDateTime.now().plusDays(30))
-                .lastUseAt(LocalDateTime.now()).revoke(false)
+                .lastUseAt(LocalDateTime.now())
+                .revoked(false)
                 .tokenHash(GenrateRefreshToken.hashRefreshToken(refreshTokenRotate))
                 .userId(refreshTokenobj.getUserId())
+                .familyId(familyId)
                 .sessionRole(role)
                 .build();
 
@@ -173,10 +164,37 @@ public class StoneAuthServiceImp implements StoneAuthService {
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
 
         Map<String, String> resp = new HashMap<>();
-
         resp.put("accessToken", accessToken);
 
         return UserResponse.responseHandler("Sucessfully updated", HttpStatus.OK, resp);
+    }
+
+    private void revokeAllTokensForUser(org.bson.types.ObjectId userId) {
+        List<RefreshToken> userTokens = refreshTokenRepo.findAllByUserId(userId);
+        if (!userTokens.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            userTokens.forEach(token -> {
+                if (!Boolean.TRUE.equals(token.getRevoked())) {
+                    token.setRevoked(true);
+                    token.setRevokedAt(now);
+                }
+            });
+            refreshTokenRepo.saveAll(userTokens);
+        }
+    }
+
+    private void revokeAllTokensInFamily(String familyId) {
+        List<RefreshToken> familyTokens = refreshTokenRepo.findAllByFamilyId(familyId);
+        if (!familyTokens.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            familyTokens.forEach(token -> {
+                if (!Boolean.TRUE.equals(token.getRevoked())) {
+                    token.setRevoked(true);
+                    token.setRevokedAt(now);
+                }
+            });
+            refreshTokenRepo.saveAll(familyTokens);
+        }
     }
 
     @Override
@@ -188,19 +206,21 @@ public class StoneAuthServiceImp implements StoneAuthService {
             throw new StoneInscriptionException("Unauthorized", HttpStatus.UNAUTHORIZED);
         }
 
-        if (refreshTokenobj.getRevoke()) {
+        if (Boolean.TRUE.equals(refreshTokenobj.getRevoked())) {
             throw new StoneInscriptionException("Unauthorize access used token", HttpStatus.UNAUTHORIZED);
         }
 
         if (refreshTokenobj.getExpiresAt().isBefore(LocalDateTime.now())) {
-            refreshTokenobj.setRevoke(true);
+            refreshTokenobj.setRevoked(true);
+            refreshTokenobj.setRevokedAt(LocalDateTime.now());
             refreshTokenRepo.save(refreshTokenobj);
 
             throw new StoneInscriptionException("Unauthorize Token Expired", HttpStatus.UNAUTHORIZED);
         }
 
         if (refreshTokenobj.getLastUseAt().plusMinutes(15).isBefore(LocalDateTime.now())) {
-            refreshTokenobj.setRevoke(true);
+            refreshTokenobj.setRevoked(true);
+            refreshTokenobj.setRevokedAt(LocalDateTime.now());
             refreshTokenRepo.save(refreshTokenobj);
             throw new StoneInscriptionException("Unauthorize Exceed Ideal Limits", HttpStatus.UNAUTHORIZED);
         }

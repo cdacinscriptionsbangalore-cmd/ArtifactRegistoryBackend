@@ -17,10 +17,12 @@ public class RefreshToken {
     private String id;
     private String tokenHash;
     private ObjectId userId;
+    private String familyId;
     private LocalDateTime expiresAt;
     private LocalDateTime lastUseAt;
     private LocalDateTime createdAt;
-    private Boolean revoke;
+    private Boolean revoked;
+    private LocalDateTime revokedAt;
     private String sessionRole;
     // private String deviceId;
     // private String ipAddress;
