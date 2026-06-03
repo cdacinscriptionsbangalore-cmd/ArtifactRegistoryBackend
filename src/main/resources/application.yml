@@ -98,7 +98,7 @@ spring:
         provider:
           # Google OAuth2 Provider (Modified)
           google:
-            authorization-uri: https://accounts.google.com/o/oauth2/auth?prompt=select_account&access_type=offline
+            authorization-uri: https://accounts.google.com/o/oauth2/auth
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
             user-name-attribute: sub
