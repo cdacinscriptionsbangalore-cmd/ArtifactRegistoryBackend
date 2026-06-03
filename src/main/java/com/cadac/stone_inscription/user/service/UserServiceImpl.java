@@ -2,7 +2,6 @@ package com.cadac.stone_inscription.user.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +16,8 @@ import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.entity.UserImage;
 import com.cadac.stone_inscription.entity.UserImage.ImageType;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.file.FileValidationService;
+import com.cadac.stone_inscription.file.FileValidationService.ValidatedImage;
 import com.cadac.stone_inscription.repository.UserImageRepo;
 import com.cadac.stone_inscription.repository.UserRepository;
 import com.cadac.stone_inscription.user.dto.UpdateProfileRequest;
@@ -32,11 +33,11 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private UserImageRepo userImageRepo;
 
+    @Autowired
+    private FileValidationService fileValidationService;
+
     @Value("${app.backend.url}")
     private String backendUrl;
-
-    @Value("${file.extn}")
-    private String[] allowedFileExtensions;
 
     @Override
     public ResponseEntity<?> getProfile(String emailFromToken) {
@@ -131,12 +132,11 @@ public class UserServiceImpl implements UserService {
             throw new StoneInscriptionException(imageType.name().toLowerCase() + " image is required", HttpStatus.BAD_REQUEST);
         }
 
-        // Validate file extension
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || Arrays.stream(allowedFileExtensions)
-                .noneMatch(ext -> originalFilename.toLowerCase().endsWith(ext))) {
-            throw new StoneInscriptionException("Invalid file format. Only allowed: " + Arrays.toString(allowedFileExtensions),
-                    HttpStatus.BAD_REQUEST);
+        ValidatedImage validatedImage;
+        try {
+            validatedImage = fileValidationService.validateImageFile(file);
+        } catch (IOException e) {
+            throw new StoneInscriptionException("Failed to validate image file", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         User user = userRepository.findByEmail(emailFromToken);
@@ -144,43 +144,38 @@ public class UserServiceImpl implements UserService {
             throw new StoneInscriptionException("User not found", HttpStatus.UNAUTHORIZED);
         }
 
-        try {
-            // Delete existing image of same type if exists
-            userImageRepo.findByUserIdAndImageType(user.getId(), imageType)
-                    .ifPresent(existingImage -> userImageRepo.delete(existingImage));
+        // Delete existing image of same type if exists
+        userImageRepo.findByUserIdAndImageType(user.getId(), imageType)
+                .ifPresent(existingImage -> userImageRepo.delete(existingImage));
 
-            // Create new user image
-            UserImage userImage = UserImage.builder()
-                    .userId(user.getId())
-                    .imageType(imageType)
-                    .imageData(file.getBytes())
-                    .metadata(UserImage.Metadata.builder()
-                            .fileName(originalFilename)
-                            .fileSize(file.getSize())
-                            .contentType(file.getContentType())
-                            .build())
-                    .build();
+        // Create new user image
+        UserImage userImage = UserImage.builder()
+                .userId(user.getId())
+                .imageType(imageType)
+                .imageData(validatedImage.bytes())
+                .metadata(UserImage.Metadata.builder()
+                        .fileName(validatedImage.storedFileName())
+                        .fileSize(validatedImage.fileSize())
+                        .contentType(validatedImage.contentType())
+                        .build())
+                .build();
 
-            UserImage savedImage = userImageRepo.save(userImage);
+        UserImage savedImage = userImageRepo.save(userImage);
 
-            // Update user's profile/cover image URL
-            String imageUrl = backendUrl + "/user/public/images/" + savedImage.getId();
+        // Update user's profile/cover image URL
+        String imageUrl = backendUrl + "/user/public/images/" + savedImage.getId();
 
-            if (imageType == ImageType.PROFILE) {
-                user.setProfileImage(imageUrl);
-            } else {
-                user.setCoverImage(imageUrl);
-            }
-
-            User savedUser = userRepository.save(user);
-            UserProfileResponse response = mapToUserProfileResponse(savedUser);
-
-            String message = imageType == ImageType.PROFILE ? "Profile image updated successfully" : "Cover image updated successfully";
-            return UserResponse.responseHandler(message, HttpStatus.OK, response);
-
-        } catch (IOException e) {
-            throw new StoneInscriptionException("Failed to process image file", HttpStatus.INTERNAL_SERVER_ERROR);
+        if (imageType == ImageType.PROFILE) {
+            user.setProfileImage(imageUrl);
+        } else {
+            user.setCoverImage(imageUrl);
         }
+
+        User savedUser = userRepository.save(user);
+        UserProfileResponse response = mapToUserProfileResponse(savedUser);
+
+        String message = imageType == ImageType.PROFILE ? "Profile image updated successfully" : "Cover image updated successfully";
+        return UserResponse.responseHandler(message, HttpStatus.OK, response);
     }
 
     /**

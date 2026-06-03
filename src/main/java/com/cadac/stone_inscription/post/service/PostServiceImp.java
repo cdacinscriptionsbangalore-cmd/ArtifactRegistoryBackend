@@ -1,6 +1,8 @@
 package com.cadac.stone_inscription.post.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +30,8 @@ import com.cadac.stone_inscription.entity.InscriptionPost;
 import com.cadac.stone_inscription.entity.PublicPostDescription;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.file.FileValidationService;
+import com.cadac.stone_inscription.file.FileValidationService.ValidatedImage;
 import com.cadac.stone_inscription.moderation.model.ContentModeration;
 import com.cadac.stone_inscription.moderation.model.ContentModerationResult;
 import com.cadac.stone_inscription.moderation.service.ContentModerationService;
@@ -66,6 +70,9 @@ public class PostServiceImp implements PostService {
 
     @Autowired
     private ContentModerationService contentModerationService;
+
+    @Autowired
+    private FileValidationService fileValidationService;
 
     @Autowired
     private ContentDeleteService contentDeleteService;
@@ -628,7 +635,25 @@ public class PostServiceImp implements PostService {
             return List.of();
         }
 
+        List<ValidatedImage> validatedFiles = Arrays.stream(files)
+                .map(file -> {
+                    try {
+                        return fileValidationService.validateImageFile(file);
+                    } catch (IOException e) {
+                        throw new StoneInscriptionException("Failed to validate image file", HttpStatus.INTERNAL_SERVER_ERROR);
+                    }
+                }).toList();
+
         List<ImageMetaAndInfo> ls = metadataGeolocationWithPhash.getGeoLocationWithIamgeMetaandInfo(files);
+
+        for (int i = 0; i < ls.size() && i < validatedFiles.size(); i++) {
+            ImageMetaAndInfo info = ls.get(i);
+            ValidatedImage validatedImage = validatedFiles.get(i);
+            info.setFileName(validatedImage.storedFileName());
+            info.setFileSize(validatedImage.fileSize());
+            info.setContentType(validatedImage.contentType());
+            info.setFile(validatedImage.bytes());
+        }
 
         if (ls.size() == 0) {
             throw new StoneInscriptionException("No Valid Image Found in the Request", HttpStatus.BAD_REQUEST);
