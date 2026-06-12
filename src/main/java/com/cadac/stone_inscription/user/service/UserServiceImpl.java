@@ -2,6 +2,7 @@ package com.cadac.stone_inscription.user.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,7 @@ import com.cadac.stone_inscription.entity.UserImage.ImageType;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.file.FileValidationService;
 import com.cadac.stone_inscription.file.FileValidationService.ValidatedImage;
+import com.cadac.stone_inscription.minio.service.MinioStorageService;
 import com.cadac.stone_inscription.repository.UserImageRepo;
 import com.cadac.stone_inscription.repository.UserRepository;
 import com.cadac.stone_inscription.user.dto.UpdateProfileRequest;
@@ -38,6 +40,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private FileValidationService fileValidationService;
+
+    @Autowired
+    private MinioStorageService minioStorageService;
 
     @Value("${app.backend.url}")
     private String backendUrl;
@@ -127,7 +132,8 @@ public class UserServiceImpl implements UserService {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.getMetadata().getContentType()))
-                .body(new InputStreamResource(new ByteArrayInputStream(image.getImageData())));
+                .contentLength(image.getMetadata().getFileSize())
+                .body(new InputStreamResource(minioStorageService.getObject(image.getObjectName())));
     }
 
     /**
@@ -150,23 +156,36 @@ public class UserServiceImpl implements UserService {
             throw new StoneInscriptionException("User not found", HttpStatus.UNAUTHORIZED);
         }
 
-        // Delete existing image of same type if exists
-        userImageRepo.findByUserIdAndImageType(user.getId(), imageType)
-                .ifPresent(existingImage -> userImageRepo.delete(existingImage));
+        Optional<UserImage> existingImage = userImageRepo.findByUserIdAndImageType(user.getId(), imageType);
+        String objectName = buildUserImageObjectName(user, imageType, validatedImage.storedFileName());
 
-        // Create new user image
-        UserImage userImage = UserImage.builder()
+        minioStorageService.putObject(
+                objectName,
+                new ByteArrayInputStream(validatedImage.bytes()),
+                validatedImage.fileSize(),
+                validatedImage.contentType());
+
+        UserImage userImage = existingImage.orElseGet(() -> UserImage.builder()
                 .userId(user.getId())
                 .imageType(imageType)
-                .imageData(validatedImage.bytes())
-                .metadata(UserImage.Metadata.builder()
-                        .fileName(validatedImage.storedFileName())
-                        .fileSize(validatedImage.fileSize())
-                        .contentType(validatedImage.contentType())
-                        .build())
-                .build();
+                .build());
+        String previousObjectName = userImage.getObjectName();
+        UserImage.Metadata previousMetadata = userImage.getMetadata();
 
-        UserImage savedImage = userImageRepo.save(userImage);
+        userImage.setObjectName(objectName);
+        userImage.setMetadata(UserImage.Metadata.builder()
+                .fileName(validatedImage.storedFileName())
+                .fileSize(validatedImage.fileSize())
+                .contentType(validatedImage.contentType())
+                .build());
+
+        UserImage savedImage;
+        try {
+            savedImage = userImageRepo.save(userImage);
+        } catch (RuntimeException exception) {
+            minioStorageService.removeObject(objectName);
+            throw exception;
+        }
 
         // Update user's profile/cover image URL
         String imageUrl = backendUrl + "/user/public/images/" + savedImage.getId();
@@ -177,11 +196,41 @@ public class UserServiceImpl implements UserService {
             user.setCoverImage(imageUrl);
         }
 
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.save(user);
+        } catch (RuntimeException exception) {
+            minioStorageService.removeObject(objectName);
+            restorePreviousUserImage(savedImage, previousObjectName, previousMetadata, existingImage.isPresent());
+            throw exception;
+        }
+
+        if (previousObjectName != null && !previousObjectName.equals(objectName)) {
+            minioStorageService.removeObject(previousObjectName);
+        }
         UserProfileResponse response = mapToUserProfileResponse(savedUser);
 
         String message = imageType == ImageType.PROFILE ? "Profile image updated successfully" : "Cover image updated successfully";
         return UserResponse.responseHandler(message, HttpStatus.OK, response);
+    }
+
+    private String buildUserImageObjectName(User user, ImageType imageType, String fileName) {
+        return "users/" + user.getId().toHexString() + "/" + imageType.name().toLowerCase() + "/" + fileName;
+    }
+
+    private void restorePreviousUserImage(
+            UserImage image,
+            String previousObjectName,
+            UserImage.Metadata previousMetadata,
+            boolean existedPreviously) {
+        if (!existedPreviously) {
+            userImageRepo.delete(image);
+            return;
+        }
+
+        image.setObjectName(previousObjectName);
+        image.setMetadata(previousMetadata);
+        userImageRepo.save(image);
     }
 
     /**

@@ -317,7 +317,7 @@ class ReportActionServiceTests {
         private ObjectId deletedCommentId;
 
         TrackingDeleteService() {
-            super(null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null);
         }
 
         @Override

@@ -13,6 +13,7 @@ import com.cadac.stone_inscription.entity.InscriptionPost;
 import com.cadac.stone_inscription.entity.PublicPostDescription;
 import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
+import com.cadac.stone_inscription.minio.service.MinioStorageService;
 import com.cadac.stone_inscription.repository.ImagesDataRepo;
 import com.cadac.stone_inscription.repository.InscriptionPostRepo;
 import com.cadac.stone_inscription.repository.PublicPostDescriptionRepo;
@@ -31,6 +32,7 @@ public class ContentDeleteService {
     private final ArchiveContentMapper archiveContentMapper;
     private final ImagesDataRepo imagesDataRepo;
     private final UserRepository userRepository;
+    private final MinioStorageService minioStorageService;
 
     public ContentDeleteResult deletePost(ObjectId postId) {
         InscriptionPost post = inscriptionPostRepo.findById(postId)
@@ -44,7 +46,7 @@ public class ContentDeleteService {
                 .map(archiveContentMapper::toArchiveComment)
                 .forEach(archiveCommentRepository::save);
 
-        imageIds.forEach(imagesDataRepo::deleteById);
+        imageIds.forEach(this::deleteImage);
         publicPostDescriptionRepo.deleteAll(comments);
         inscriptionPostRepo.delete(post);
         decrementUserImagesUploaded(post.getUserId(), imageIds.size());
@@ -76,6 +78,13 @@ public class ContentDeleteService {
         }
 
         return post.getImages().getImage();
+    }
+
+    private void deleteImage(String imageId) {
+        imagesDataRepo.findById(imageId).ifPresent(image -> {
+            minioStorageService.removeObject(image.getObjectName());
+            imagesDataRepo.delete(image);
+        });
     }
 
     private void decrementUserImagesUploaded(ObjectId userId, int imageCount) {

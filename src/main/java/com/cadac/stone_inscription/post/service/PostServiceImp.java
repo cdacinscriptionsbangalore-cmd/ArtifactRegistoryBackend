@@ -1,6 +1,5 @@
 package com.cadac.stone_inscription.post.service;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +31,7 @@ import com.cadac.stone_inscription.entity.User;
 import com.cadac.stone_inscription.exception.StoneInscriptionException;
 import com.cadac.stone_inscription.file.FileValidationService;
 import com.cadac.stone_inscription.file.FileValidationService.ValidatedImage;
+import com.cadac.stone_inscription.minio.service.MinioStorageService;
 import com.cadac.stone_inscription.moderation.model.ContentModeration;
 import com.cadac.stone_inscription.moderation.model.ContentModerationResult;
 import com.cadac.stone_inscription.moderation.service.ContentModerationService;
@@ -79,6 +79,9 @@ public class PostServiceImp implements PostService {
 
     @Autowired
     private BlacklistGuardService blacklistGuardService;
+
+    @Autowired
+    private MinioStorageService minioStorageService;
 
     @Value("${app.backend.url}")
     private String backendUrl;
@@ -192,33 +195,29 @@ public class PostServiceImp implements PostService {
 
     @Override
     public ResponseEntity<?> getAllPost() {
-
         List<InscriptionPost> allPost = inscriptionPostRepo.findAll();
 
         allPost.forEach(elem -> {
-
-            if (elem.getVisiblity() || elem.getVisiblity() == null) {
-                elem.setUserName(userRepository.findById(elem.getUserId()).get().getName());
+            if (elem.getImages() == null || elem.getImages().getImage() == null) {
+                return; // skip posts with no images
             }
 
-            elem.getImages().setImage(elem.getImages().getImage().stream().map(
-                    el -> backendUrl + "/post/public/images/" + el)
+            if (elem.getVisiblity() == null || elem.getVisiblity()) {
+                userRepository.findById(elem.getUserId())
+                        .ifPresent(user -> elem.setUserName(user.getName()));
+            }
+
+            elem.getImages().setImage(elem.getImages().getImage().stream()
+                    .map(el -> backendUrl + "/post/public/images/" + el)
                     .toList());
 
-            elem.getImages()
-                    .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
-
+            if (elem.getImages().getThumbnailImage() != null) {
+                elem.getImages().setThumbnailImage(
+                        backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+            }
         });
 
         return UserResponse.responseHandler("All Posts", HttpStatus.OK, allPost);
-    }
-
-    @Override
-    public ResponseEntity<InputStreamResource> getImages(String id) {
-        ImagesData image = imagesDataRepo.findById(id).orElseThrow();
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(image.getMetadata().getContentType()))
-                .body(new InputStreamResource(new ByteArrayInputStream(image.getImageData())));
     }
 
     @Override
@@ -227,18 +226,73 @@ public class PostServiceImp implements PostService {
         List<InscriptionPost> userPost = inscriptionPostRepo.findByUserId(postUserId);
 
         userPost.forEach(elem -> {
+            if (elem.getImages() == null || elem.getImages().getImage() == null) {
+                return;
+            }
 
-            elem.getImages().setImage(elem.getImages().getImage().stream().map(
-                    el -> backendUrl + "/post/public/images/" + el)
+            elem.getImages().setImage(elem.getImages().getImage().stream()
+                    .map(el -> backendUrl + "/post/public/images/" + el)
                     .toList());
 
-            elem.getImages()
-                    .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
-
+            if (elem.getImages().getThumbnailImage() != null) {
+                elem.getImages().setThumbnailImage(
+                        backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+            }
         });
 
         return UserResponse.responseHandler("All Posts", HttpStatus.OK, userPost);
     }
+    // @Override
+    // public ResponseEntity<?> getAllPost() {
+
+    //     List<InscriptionPost> allPost = inscriptionPostRepo.findAll();
+
+    //     allPost.forEach(elem -> {
+
+    //         if (elem.getVisiblity() || elem.getVisiblity() == null) {
+    //             elem.setUserName(userRepository.findById(elem.getUserId()).get().getName());
+    //         }
+
+    //         elem.getImages().setImage(elem.getImages().getImage().stream().map(
+    //                 el -> backendUrl + "/post/public/images/" + el)
+    //                 .toList());
+
+    //         elem.getImages()
+    //                 .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+
+    //     });
+
+    //     return UserResponse.responseHandler("All Posts", HttpStatus.OK, allPost);
+    // }
+
+    @Override
+    public ResponseEntity<InputStreamResource> getImages(String id) {
+        ImagesData image = imagesDataRepo.findById(id)
+                .orElseThrow(() -> new StoneInscriptionException("Image not found", HttpStatus.NOT_FOUND));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(image.getMetadata().getContentType()))
+                .contentLength(image.getMetadata().getFileSize())
+                .body(new InputStreamResource(minioStorageService.getObject(image.getObjectName())));
+    }
+
+    // @Override
+    // public ResponseEntity<?> getAllUserPost(String usernameFromToken) {
+    //     ObjectId postUserId = userRepository.findByEmail(usernameFromToken).getId();
+    //     List<InscriptionPost> userPost = inscriptionPostRepo.findByUserId(postUserId);
+
+    //     userPost.forEach(elem -> {
+
+    //         elem.getImages().setImage(elem.getImages().getImage().stream().map(
+    //                 el -> backendUrl + "/post/public/images/" + el)
+    //                 .toList());
+
+    //         elem.getImages()
+    //                 .setThumbnailImage(backendUrl + "/post/public/images/" + elem.getImages().getThumbnailImage());
+
+    //     });
+
+    //     return UserResponse.responseHandler("All Posts", HttpStatus.OK, userPost);
+    // }
 
     @Override
     public ResponseEntity<?> addPoastDiscription(String usernameFromToken, String postId, String discription) {
@@ -681,16 +735,35 @@ public class PostServiceImp implements PostService {
     }
 
     private List<String> saveImages(ObjectId postId, List<ImageMetaAndInfo> images) {
-        return images.stream().map(image -> imagesDataRepo.save(ImagesData.builder()
-                .imageData(image.getFile())
-                .postId(postId)
-                .metadata(ImagesData.Metadata.builder()
-                        .fileName(image.getFileName())
-                        .fileSize(image.getFileSize())
-                        .contentType(image.getContentType())
-                        .imageHashValue(image.getPHash().getHashValue().toString())
-                        .build())
-                .build()).getId()).toList();
+        return images.stream()
+                .map(image -> saveImage(postId, image))
+                .toList();
+    }
+
+    private String saveImage(ObjectId postId, ImageMetaAndInfo image) {
+        String objectName = "posts/" + postId.toHexString() + "/" + image.getFileName();
+
+        minioStorageService.putObject(
+                objectName,
+                new java.io.ByteArrayInputStream(image.getFile()),
+                image.getFileSize(),
+                image.getContentType());
+
+        try {
+            return imagesDataRepo.save(ImagesData.builder()
+                    .objectName(objectName)
+                    .postId(postId)
+                    .metadata(ImagesData.Metadata.builder()
+                            .fileName(image.getFileName())
+                            .fileSize(image.getFileSize())
+                            .contentType(image.getContentType())
+                            .imageHashValue(image.getPHash().getHashValue().toString())
+                            .build())
+                    .build()).getId();
+        } catch (RuntimeException exception) {
+            minioStorageService.removeObject(objectName);
+            throw exception;
+        }
     }
 
     private List<ObjectId> getUserPostIds(ObjectId userId) {
@@ -775,7 +848,14 @@ public class PostServiceImp implements PostService {
     }
 
     private void deleteImagesByIds(Set<String> imageIds) {
-        imageIds.forEach(imagesDataRepo::deleteById);
+        imageIds.forEach(this::deleteImage);
+    }
+
+    private void deleteImage(String imageId) {
+        ImagesData image = imagesDataRepo.findById(imageId)
+                .orElseThrow(() -> new StoneInscriptionException("Image not found", HttpStatus.NOT_FOUND));
+        minioStorageService.removeObject(image.getObjectName());
+        imagesDataRepo.delete(image);
     }
 
     private void adjustUserImagesUploaded(User user, int delta) {

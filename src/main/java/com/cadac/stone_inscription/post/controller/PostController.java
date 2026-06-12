@@ -103,6 +103,7 @@ public class PostController {
     }
 
     @GetMapping("/public/images/{id}")
+    @Secured("user")
     @Operation(
             summary = "Download post image",
             description = "Public endpoint that streams a stored inscription image by id.",

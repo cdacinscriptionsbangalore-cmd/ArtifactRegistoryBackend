@@ -28,9 +28,9 @@ public class ImagesData {
         @JsonSerialize(using = ToStringSerializer.class)
     private ObjectId postId;  // Reference to Post document
 
-    @Field("image_data")
-    @JsonProperty("imageData")
-    private byte[] imageData; // Binary image data
+    @Field("object_name")
+    @JsonProperty("objectName")
+    private String objectName;
 
     
     @JsonProperty("metadata")
