@@ -32,9 +32,9 @@ public class UserImage {
     @JsonProperty("imageType")
     private ImageType imageType;
 
-    @Field("image_data")
-    @JsonProperty("imageData")
-    private byte[] imageData;
+    @Field("object_name")
+    @JsonProperty("objectName")
+    private String objectName;
 
     @JsonProperty("metadata")
     private Metadata metadata;
